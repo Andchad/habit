@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -46,9 +47,17 @@ class MainActivity : ComponentActivity() {
         ActivityResultContracts.RequestPermission()
     ) { isGranted: Boolean ->
         if (isGranted) {
-            // Permission granted
+            Toast.makeText(
+                this,
+                "Notifications enabled! You'll receive reminders for your habits.",
+                Toast.LENGTH_SHORT
+            ).show()
         } else {
-            // Permission denied - you might want to show an explanation
+            Toast.makeText(
+                this,
+                "Habit reminders won't work without notification permission. You can enable it in app settings.",
+                Toast.LENGTH_LONG
+            ).show()
         }
     }
 
