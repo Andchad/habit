@@ -1,0 +1,274 @@
+v<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hab-it! Splash Screen</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #6A11CB, #2575FC);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .splash-container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .logo-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 2rem;
+        }
+        
+        .logo-icon {
+            width: 150px;
+            height: 150px;
+            background-color: white;
+            border-radius: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 2rem;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+            transform: rotate(-5deg);
+            transition: transform 0.3s;
+            animation: bounce 3s infinite;
+        }
+        
+        @keyframes bounce {
+            0%, 100% { transform: rotate(-5deg) translateY(0); }
+            50% { transform: rotate(-3deg) translateY(-15px); }
+        }
+        
+        .logo-icon-inner {
+            width: 70%;
+            height: 70%;
+            border: 8px solid #6A11CB;
+            border-radius: 16px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .logo-icon-inner::before {
+            content: '';
+            position: absolute;
+            width: 40%;
+            height: 65%;
+            border-left: 8px solid #6A11CB;
+            border-bottom: 8px solid #6A11CB;
+            transform: rotate(-45deg) translate(0px, -8px);
+            border-radius: 4px;
+        }
+        
+        .logo {
+            font-size: 3.5rem;
+            font-weight: 700;
+            color: white;
+            text-align: center;
+            letter-spacing: 1px;
+            text-shadow: 2px 4px 8px rgba(0, 0, 0, 0.2);
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        
+        .loading-bar {
+            width: 200px;
+            height: 6px;
+            background-color: rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            overflow: hidden;
+            margin-top: 1rem;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .loading-progress {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #ffffff, #f0f8ff);
+            border-radius: 6px;
+            animation: loading 3s ease-in-out forwards;
+        }
+        
+        .bubbles {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            z-index: 0;
+            overflow: hidden;
+        }
+        
+        .bubble {
+            position: absolute;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(1px);
+            animation: float 8s infinite;
+        }
+        
+        @keyframes loading {
+            0% { width: 0%; }
+            15% { width: 15%; }
+            30% { width: 40%; }
+            50% { width: 65%; }
+            75% { width: 85%; }
+            100% { width: 100%; }
+        }
+        
+        @keyframes float {
+            0% { transform: translateY(100vh) scale(0); opacity: 0; }
+            10% { opacity: 1; }
+            100% { transform: translateY(-20vh) scale(1); opacity: 0; }
+        }
+        
+        .version {
+            position: absolute;
+            bottom: 1rem;
+            right: 1rem;
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+        
+        .company {
+            position: absolute;
+            bottom: 1rem;
+            left: 1rem;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 1rem;
+            font-weight: 500;
+        }
+        
+        /* Confetti elements */
+        .confetti {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background-color: #FFC107;
+            opacity: 0.8;
+            animation: confetti-fall 4s linear infinite;
+        }
+        
+        @keyframes confetti-fall {
+            0% { transform: translateY(-100vh) rotate(0deg); }
+            100% { transform: translateY(100vh) rotate(720deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="bubbles">
+        <!-- Bubbles will be added by JavaScript -->
+    </div>
+    
+    <div class="splash-container">
+        <div class="logo-container">
+            <div class="logo-icon">
+                <div class="logo-icon-inner"></div>
+            </div>
+            <h1 class="logo">Hab-it!</h1>
+        </div>
+        
+        <div class="loading-bar">
+            <div class="loading-progress"></div>
+        </div>
+    </div>
+    
+    <div class="version">v1.0.0</div>
+    <div class="company">By Andchad</div>
+    
+    <script>
+        // Create colorful bubbles
+        function createBubbles() {
+            const bubblesContainer = document.querySelector('.bubbles');
+            const colors = ['#8A2BE2', '#4B0082', '#9370DB', '#483D8B', '#7B68EE'];
+            
+            for (let i = 0; i < 20; i++) {
+                const bubble = document.createElement('div');
+                bubble.className = 'bubble';
+                
+                // Random properties
+                const size = Math.random() * 60 + 20;
+                const color = colors[Math.floor(Math.random() * colors.length)];
+                
+                bubble.style.width = `${size}px`;
+                bubble.style.height = `${size}px`;
+                bubble.style.left = `${Math.random() * 100}%`;
+                bubble.style.backgroundColor = color;
+                bubble.style.animationDuration = `${Math.random() * 10 + 5}s`;
+                bubble.style.animationDelay = `${Math.random() * 5}s`;
+                
+                bubblesContainer.appendChild(bubble);
+            }
+        }
+        
+        // Create confetti elements
+        function createConfetti() {
+            const colors = ['#FF5252', '#FFD740', '#64FFDA', '#448AFF', '#B39DDB', '#FFAB40'];
+            const shapes = ['square', 'circle', 'triangle'];
+            
+            for (let i = 0; i < 40; i++) {
+                const confetti = document.createElement('div');
+                confetti.className = 'confetti';
+                
+                const size = Math.random() * 8 + 5;
+                const color = colors[Math.floor(Math.random() * colors.length)];
+                const shape = shapes[Math.floor(Math.random() * shapes.length)];
+                
+                confetti.style.width = `${size}px`;
+                confetti.style.height = `${size}px`;
+                confetti.style.left = `${Math.random() * 100}%`;
+                confetti.style.backgroundColor = color;
+                confetti.style.animationDuration = `${Math.random() * 3 + 2}s`;
+                confetti.style.animationDelay = `${Math.random() * 5}s`;
+                
+                if (shape === 'circle') {
+                    confetti.style.borderRadius = '50%';
+                } else if (shape === 'triangle') {
+                    confetti.style.width = '0';
+                    confetti.style.height = '0';
+                    confetti.style.backgroundColor = 'transparent';
+                    confetti.style.borderLeft = `${size}px solid transparent`;
+                    confetti.style.borderRight = `${size}px solid transparent`;
+                    confetti.style.borderBottom = `${size * 1.5}px solid ${color}`;
+                }
+                
+                document.body.appendChild(confetti);
+            }
+        }
+        
+        // Initialize animations
+        window.onload = function() {
+            createBubbles();
+            createConfetti();
+        };
+    </script>
+</body>
+</html>
