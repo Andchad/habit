@@ -44,6 +44,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import com.andchad.habit.data.model.Habit
 import kotlinx.coroutines.delay
+import androidx.compose.foundation.isSystemInDarkTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -116,9 +117,24 @@ fun HabitItem(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DismissBackground(dismissState: DismissState) {
+    val isInDarkTheme = isSystemInDarkTheme()
+
     val color = when (dismissState.dismissDirection) {
-        DismissDirection.EndToStart -> Color.Red
-        DismissDirection.StartToEnd -> Color.Green
+        DismissDirection.EndToStart -> {
+            // Use a softer red color for dark theme to reduce contrast
+            if (isInDarkTheme) {
+                Color(0xFF703232) // Darker, less saturated red
+            } else {
+                Color.Red
+            }
+        }
+        DismissDirection.StartToEnd -> {
+            if (isInDarkTheme) {
+                Color(0xFF2E5B2E) // Darker, less saturated green
+            } else {
+                Color.Green
+            }
+        }
         null -> Color.Transparent
     }
 
@@ -136,7 +152,7 @@ private fun DismissBackground(dismissState: DismissState) {
             Icon(
                 imageVector = Icons.Default.Delete,
                 contentDescription = "Delete",
-                tint = Color.White
+                tint = if (isInDarkTheme) Color(0xFFE0E0E0) else Color.White // Softer white for dark theme
             )
         }
     }

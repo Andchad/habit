@@ -6,7 +6,9 @@ import com.andchad.habit.data.HabitDao
 import com.andchad.habit.data.HabitDatabase
 import com.andchad.habit.data.HabitRepository
 import com.andchad.habit.data.MIGRATION_1_2
+import com.andchad.habit.data.MIGRATION_2_3
 import com.andchad.habit.utils.AdManager
+import com.andchad.habit.utils.AlarmUtils
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -28,7 +30,7 @@ object AppModule {
             HabitDatabase::class.java,
             "habits_database"
         )
-            .addMigrations(MIGRATION_1_2)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
             .build()
     }
 
@@ -51,5 +53,13 @@ object AppModule {
         @ApplicationContext context: Context
     ): AdManager {
         return AdManager(context)
+    }
+
+    @Provides
+    @Singleton
+    fun provideAlarmUtils(
+        @ApplicationContext context: Context
+    ): AlarmUtils {
+        return AlarmUtils(context)
     }
 }

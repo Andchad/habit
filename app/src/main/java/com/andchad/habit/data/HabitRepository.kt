@@ -27,13 +27,21 @@ class HabitRepository @Inject constructor(
     }
 
     // Create a new habit
-    suspend fun createHabit(name: String, reminderTime: String, scheduledDays: List<DayOfWeek>): Habit {
+    suspend fun createHabit(
+        name: String,
+        reminderTime: String,
+        scheduledDays: List<DayOfWeek>,
+        vibrationEnabled: Boolean,
+        snoozeEnabled: Boolean
+    ): Habit {
         val habitId = UUID.randomUUID().toString()
         val habit = Habit(
             id = habitId,
             name = name,
             reminderTime = reminderTime,
-            scheduledDays = scheduledDays
+            scheduledDays = scheduledDays,
+            vibrationEnabled = vibrationEnabled,
+            snoozeEnabled = snoozeEnabled
         )
 
         // Add to local database
@@ -43,9 +51,33 @@ class HabitRepository @Inject constructor(
     }
 
     // Update habit details
-    suspend fun updateHabit(id: String, name: String, reminderTime: String, scheduledDays: List<DayOfWeek>) {
+    suspend fun updateHabit(
+        id: String,
+        name: String,
+        reminderTime: String,
+        scheduledDays: List<DayOfWeek>,
+        vibrationEnabled: Boolean,
+        snoozeEnabled: Boolean
+    ) {
         // Update in local database
-        habitDao.updateHabitDetailsWithSchedule(id, name, reminderTime, scheduledDays)
+        habitDao.updateHabitDetailsWithAlarmSettings(
+            id,
+            name,
+            reminderTime,
+            scheduledDays,
+            vibrationEnabled,
+            snoozeEnabled
+        )
+    }
+
+    // Update just the vibration setting
+    suspend fun updateVibrationSetting(id: String, vibrationEnabled: Boolean) {
+        habitDao.updateVibrationSetting(id, vibrationEnabled)
+    }
+
+    // Update just the snooze setting
+    suspend fun updateSnoozeSetting(id: String, snoozeEnabled: Boolean) {
+        habitDao.updateSnoozeSetting(id, snoozeEnabled)
     }
 
     // Mark habit as completed

@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Timer
@@ -32,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.andchad.habit.data.model.Habit
 import com.andchad.habit.ui.HabitViewModel
+import com.andchad.habit.ui.screens.components.AlarmSettingsComponent
 import com.andchad.habit.ui.screens.components.DaySelector
 import com.andchad.habit.ui.screens.components.WheelTimePicker
 import com.andchad.habit.ui.screens.components.formatTime
@@ -45,7 +48,7 @@ import kotlinx.coroutines.launch
 fun AddEditHabitScreen(
     habit: Habit?,
     viewModel: HabitViewModel,
-    onSave: (String, String, List<DayOfWeek>) -> Unit,
+    onSave: (String, String, List<DayOfWeek>, Boolean, Boolean) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -61,6 +64,10 @@ fun AddEditHabitScreen(
     var selectedDays by remember {
         mutableStateOf(habit?.scheduledDays ?: emptyList<DayOfWeek>())
     }
+
+    // For alarm settings
+    var vibrationEnabled by remember { mutableStateOf(habit?.vibrationEnabled ?: true) }
+    var snoozeEnabled by remember { mutableStateOf(habit?.snoozeEnabled ?: true) }
 
     // Parse the existing reminder time or use current time
     val initialTime = if (habit != null) {
@@ -111,7 +118,8 @@ fun AddEditHabitScreen(
             modifier = modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(16.dp),
+                .padding(16.dp)
+                .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             OutlinedTextField(
@@ -139,7 +147,7 @@ fun AddEditHabitScreen(
             OutlinedTextField(
                 value = selectedTime,
                 onValueChange = { },
-                label = { Text("Reminder Time") },
+                label = { Text("Alarm Time") },
                 modifier = Modifier.fillMaxWidth(),
                 readOnly = true,
                 trailingIcon = {
@@ -167,6 +175,17 @@ fun AddEditHabitScreen(
                 modifier = Modifier.fillMaxWidth()
             )
 
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Alarm settings
+            AlarmSettingsComponent(
+                vibrationEnabled = vibrationEnabled,
+                snoozeEnabled = snoozeEnabled,
+                onVibrationChange = { vibrationEnabled = it },
+                onSnoozeChange = { snoozeEnabled = it },
+                modifier = Modifier.fillMaxWidth()
+            )
+
             Spacer(modifier = Modifier.height(32.dp))
 
             Button(
@@ -186,7 +205,7 @@ fun AddEditHabitScreen(
                     scope.launch {
                         // Skip duplicate check when editing and name hasn't changed
                         if (isEditing && name == originalName) {
-                            onSave(name, selectedTime, selectedDays)
+                            onSave(name, selectedTime, selectedDays, vibrationEnabled, snoozeEnabled)
                             return@launch
                         }
 
@@ -197,7 +216,7 @@ fun AddEditHabitScreen(
                                 "A habit with this name already exists. Please use a different name."
                             )
                         } else {
-                            onSave(name, selectedTime, selectedDays)
+                            onSave(name, selectedTime, selectedDays, vibrationEnabled, snoozeEnabled)
                         }
                     }
                 },

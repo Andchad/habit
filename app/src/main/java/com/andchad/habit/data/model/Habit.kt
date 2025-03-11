@@ -14,7 +14,9 @@ data class Habit(
     val reminderTime: String, // Stored as "HH:mm" format
     val isCompleted: Boolean = false,
     val createdAt: Long = System.currentTimeMillis(),
-    val scheduledDays: List<DayOfWeek> = emptyList() // Days of week when the habit is scheduled
+    val scheduledDays: List<DayOfWeek> = emptyList(), // Days of week when the habit is scheduled
+    val vibrationEnabled: Boolean = true,  // Default to enabled
+    val snoozeEnabled: Boolean = true      // Default to enabled
 ) {
     fun getReminderTimeAsLocalTime(): LocalTime {
         return LocalTime.parse(reminderTime, DateTimeFormatter.ofPattern("HH:mm"))

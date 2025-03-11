@@ -1,7 +1,6 @@
 package com.andchad.habit.ui
 
-import android.Manifest
-import android.content.pm.PackageManager
+import android.content.Context
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
@@ -20,7 +19,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.core.content.ContextCompat
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -39,38 +37,24 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
-    companion object {
-        private var hasAppLaunched = false
-    }
-
     private val viewModel: HabitViewModel by viewModels()
 
     @Inject
     lateinit var adManager: AdManager
 
-    // Request permission launcher
-    private val requestPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { isGranted: Boolean ->
-        if (isGranted) {
-            // Permission granted
-            Toast.makeText(
-                this,
-                "Notifications enabled! You'll receive reminders for your habits.",
-                Toast.LENGTH_SHORT
-            ).show()
-        } else {
-            // Permission denied - show an explanation
-            Toast.makeText(
-                this,
-                "Habit reminders won't work without notification permission. You can enable it in app settings.",
-                Toast.LENGTH_LONG
-            ).show()
-        }
+    companion object {
+        private var hasAppLaunched = false
+    }
+
+    // Permission launcher for alarm permission
+    private val requestAlarmPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        // Just check the result, no specific handling needed
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-
+        // Only show splash screen on first launch
         if (!hasAppLaunched) {
             installSplashScreen()
             hasAppLaunched = true
@@ -78,8 +62,10 @@ class MainActivity : ComponentActivity() {
 
         super.onCreate(savedInstanceState)
 
-        // Check and request notification permission for Android 13+
-        requestNotificationPermission()
+        // Check and request alarm permission for Android 13+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            requestAlarmPermission()
+        }
 
         setContent {
             val isDarkMode by viewModel.isDarkMode.collectAsState()
@@ -99,24 +85,14 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun requestNotificationPermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            when {
-                ContextCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.POST_NOTIFICATIONS
-                ) == PackageManager.PERMISSION_GRANTED -> {
-                    // Permission already granted
+    private fun requestAlarmPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val alarmManager = getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
+            if (!alarmManager.canScheduleExactAlarms()) {
+                val intent = android.content.Intent().apply {
+                    action = android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM
                 }
-                shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS) -> {
-                    // Show a rationale to the user before requesting the permission
-                    // You could display a dialog here explaining why the permission is needed
-                    requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                }
-                else -> {
-                    // Request the permission
-                    requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                }
+                requestAlarmPermissionLauncher.launch(intent)
             }
         }
     }
@@ -156,7 +132,6 @@ fun HabitApp(
                     }
 
                     navController.navigate("add_habit") {
-                        // Navigation options for stability
                         launchSingleTop = true
                         restoreState = true
                     }
@@ -180,8 +155,14 @@ fun HabitApp(
             AddEditHabitScreen(
                 habit = null,
                 viewModel = viewModel,
-                onSave = { name, reminderTime, scheduledDays ->
-                    viewModel.createHabit(name, reminderTime, scheduledDays)
+                onSave = { name, reminderTime, scheduledDays, vibrationEnabled, snoozeEnabled ->
+                    viewModel.createHabit(
+                        name,
+                        reminderTime,
+                        scheduledDays,
+                        vibrationEnabled,
+                        snoozeEnabled
+                    )
                     navController.popBackStack()
                 },
                 onBack = { navController.popBackStack() }
@@ -200,8 +181,15 @@ fun HabitApp(
             AddEditHabitScreen(
                 habit = habit,
                 viewModel = viewModel,
-                onSave = { name, reminderTime, scheduledDays ->
-                    viewModel.updateHabit(habit.id, name, reminderTime, scheduledDays)
+                onSave = { name, reminderTime, scheduledDays, vibrationEnabled, snoozeEnabled ->
+                    viewModel.updateHabit(
+                        habit.id,
+                        name,
+                        reminderTime,
+                        scheduledDays,
+                        vibrationEnabled,
+                        snoozeEnabled
+                    )
                     navController.popBackStack()
                 },
                 onBack = { navController.popBackStack() }
