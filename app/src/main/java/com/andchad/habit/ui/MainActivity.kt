@@ -39,6 +39,10 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
+    companion object {
+        private var hasAppLaunched = false
+    }
+
     private val viewModel: HabitViewModel by viewModels()
 
     @Inject
@@ -66,8 +70,11 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // Apply the splash screen theme
-        installSplashScreen()
+
+        if (!hasAppLaunched) {
+            installSplashScreen()
+            hasAppLaunched = true
+        }
 
         super.onCreate(savedInstanceState)
 
