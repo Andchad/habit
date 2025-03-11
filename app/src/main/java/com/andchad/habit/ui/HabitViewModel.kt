@@ -193,4 +193,16 @@ class HabitViewModel @Inject constructor(
             )
         }
     }
+
+    fun deleteCompletedHabits(habits: List<Habit>) {
+        viewModelScope.launch {
+            // Delete each completed habit
+            habits.forEach { habit ->
+                habitRepository.deleteHabit(habit)
+
+                // Cancel any alarms
+                alarmUtils.cancelAlarm(habit.id)
+            }
+        }
+    }
 }

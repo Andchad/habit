@@ -1,25 +1,37 @@
 package com.andchad.habit.ui.screens
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -36,9 +48,16 @@ fun HabitListScreen(
     onAddHabit: () -> Unit,
     onEditHabit: (Habit) -> Unit,
     onDeleteHabit: (Habit) -> Unit,
+    onDeleteCompletedHabits: (List<Habit>) -> Unit,
     onToggleCompleteHabit: (String, Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var showDeleteConfirmation by remember { mutableStateOf(false) }
+
+    // Get completed habits
+    val completedHabits = habits.filter { it.isCompleted }
+    val hasCompletedHabits = completedHabits.isNotEmpty()
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -48,12 +67,18 @@ fun HabitListScreen(
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 ),
                 actions = {
-                    // Ad counter indicator
-                    Text(
-                        text = "Ad in: ${3 - adCounter}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(end = 8.dp)
-                    )
+
+                    // Delete completed habits button
+                    if (hasCompletedHabits) {
+                        IconButton(
+                            onClick = { showDeleteConfirmation = true }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = "Delete Completed Habits"
+                            )
+                        }
+                    }
 
                     IconButton(onClick = onToggleDarkMode) {
                         Icon(
@@ -89,23 +114,77 @@ fun HabitListScreen(
                     modifier = Modifier.align(Alignment.Center)
                 )
             } else {
-                LazyColumn(
-                    contentPadding = PaddingValues(vertical = 8.dp),
+                Column(
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    items(
-                        items = habits,
-                        key = { it.id }
-                    ) { habit ->
-                        HabitItem(
-                            habit = habit,
-                            onEdit = onEditHabit,
-                            onDelete = onDeleteHabit,
-                            onToggleComplete = onToggleCompleteHabit
-                        )
+                    if (hasCompletedHabits) {
+                        Button(
+                            onClick = { showDeleteConfirmation = true },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                            enabled = hasCompletedHabits
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = null,
+                                modifier = Modifier.padding(end = 8.dp)
+                            )
+                            Text(
+                                text = "Delete ${completedHabits.size} Completed ${if (completedHabits.size == 1) "Habit" else "Habits"}"
+                            )
+                        }
+                    }
+
+                    LazyColumn(
+                        contentPadding = PaddingValues(vertical = 8.dp),
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        items(
+                            items = habits,
+                            key = { it.id }
+                        ) { habit ->
+                            HabitItem(
+                                habit = habit,
+                                onEdit = onEditHabit,
+                                onDelete = onDeleteHabit,
+                                onToggleComplete = onToggleCompleteHabit
+                            )
+                        }
                     }
                 }
             }
         }
+    }
+
+    // Confirmation dialog
+    if (showDeleteConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmation = false },
+            title = { Text("Delete Completed Habits") },
+            text = {
+                Text(
+                    "Are you sure you want to delete ${completedHabits.size} completed ${if (completedHabits.size == 1) "habit" else "habits"}?" +
+                            " This action cannot be undone."
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onDeleteCompletedHabits(completedHabits)
+                        showDeleteConfirmation = false
+                    }
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showDeleteConfirmation = false }
+                ) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }

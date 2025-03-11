@@ -145,6 +145,9 @@ fun HabitApp(
                 onDeleteHabit = { habit ->
                     viewModel.deleteHabit(habit)
                 },
+                onDeleteCompletedHabits = { completedHabits ->
+                    viewModel.deleteCompletedHabits(completedHabits)
+                },
                 onToggleCompleteHabit = { id, isCompleted ->
                     viewModel.completeHabit(id, isCompleted)
                 }
