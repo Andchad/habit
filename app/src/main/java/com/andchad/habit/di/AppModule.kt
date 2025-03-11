@@ -7,9 +7,6 @@ import com.andchad.habit.data.HabitDatabase
 import com.andchad.habit.data.HabitRepository
 import com.andchad.habit.data.MIGRATION_1_2
 import com.andchad.habit.utils.AdManager
-import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.ktx.firestore
-import com.google.firebase.ktx.Firebase
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -42,17 +39,10 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideFirestore(): FirebaseFirestore {
-        return Firebase.firestore
-    }
-
-    @Provides
-    @Singleton
     fun provideHabitRepository(
-        habitDao: HabitDao,
-        firestore: FirebaseFirestore
+        habitDao: HabitDao
     ): HabitRepository {
-        return HabitRepository(habitDao, firestore)
+        return HabitRepository(habitDao)
     }
 
     @Provides

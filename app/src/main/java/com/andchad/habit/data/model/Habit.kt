@@ -20,34 +20,6 @@ data class Habit(
         return LocalTime.parse(reminderTime, DateTimeFormatter.ofPattern("HH:mm"))
     }
 
-    companion object {
-        fun fromFirestore(data: Map<String, Any>, id: String): Habit {
-            val scheduledDaysInt = (data["scheduledDays"] as? List<*>)?.filterIsInstance<Long>() ?: emptyList()
-            val scheduledDays = scheduledDaysInt.map { DayOfWeek.of(it.toInt()) }
-
-            return Habit(
-                id = id,
-                name = data["name"] as String,
-                reminderTime = data["reminderTime"] as String,
-                isCompleted = data["isCompleted"] as Boolean,
-                createdAt = data["createdAt"] as Long,
-                scheduledDays = scheduledDays
-            )
-        }
-
-        fun toFirestore(habit: Habit): Map<String, Any> {
-            val scheduledDaysInt = habit.scheduledDays.map { it.value }
-
-            return mapOf(
-                "name" to habit.name,
-                "reminderTime" to habit.reminderTime,
-                "isCompleted" to habit.isCompleted,
-                "createdAt" to habit.createdAt,
-                "scheduledDays" to scheduledDaysInt
-            )
-        }
-    }
-
     // Get formatted days of week for display
     fun getFormattedScheduledDays(): String {
         if (scheduledDays.isEmpty()) return "No days selected"

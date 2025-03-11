@@ -10,6 +10,11 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import java.time.DayOfWeek
 import javax.inject.Inject
@@ -26,7 +31,7 @@ class HabitViewModel @Inject constructor(
     private val _isDarkMode = MutableStateFlow(false)
     val isDarkMode: StateFlow<Boolean> = _isDarkMode.asStateFlow()
 
-    // User-defined order for habits
+    // Store custom sort order
     private val _habitOrder = MutableStateFlow<List<String>>(emptyList())
 
     init {
@@ -56,24 +61,6 @@ class HabitViewModel @Inject constructor(
                     }
                 }
                 _habits.value = sortedHabits
-            }
-        }
-    }
-
-    // Move a habit from one position to another
-    fun moveHabit(fromIndex: Int, toIndex: Int) {
-        val currentOrder = _habitOrder.value.toMutableList()
-        if (fromIndex < currentOrder.size && toIndex < currentOrder.size) {
-            val habitId = currentOrder.removeAt(fromIndex)
-            currentOrder.add(toIndex, habitId)
-            _habitOrder.value = currentOrder
-
-            // Update the sorted list
-            val currentHabits = _habits.value
-            _habits.value = currentHabits.sortedBy { habit ->
-                currentOrder.indexOf(habit.id).let {
-                    if (it >= 0) it else Int.MAX_VALUE
-                }
             }
         }
     }
