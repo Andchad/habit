@@ -2,17 +2,17 @@ package com.andchad.habit.data
 
 import androidx.room.Database
 import androidx.room.RoomDatabase
+import androidx.room.TypeConverters
 import com.andchad.habit.data.model.Habit
-
 import androidx.room.*
+import java.time.DayOfWeek
 import kotlinx.coroutines.flow.Flow
 
-@Database(entities = [Habit::class], version = 1, exportSchema = false)
+@Database(entities = [Habit::class], version = 2, exportSchema = false)
+@TypeConverters(DayOfWeekTypeConverter::class)
 abstract class HabitDatabase : RoomDatabase() {
     abstract fun habitDao(): HabitDao
 }
-
-
 
 @Dao
 interface HabitDao {
@@ -33,4 +33,7 @@ interface HabitDao {
 
     @Query("UPDATE habits SET name = :name, reminderTime = :reminderTime WHERE id = :id")
     suspend fun updateHabitDetails(id: String, name: String, reminderTime: String)
+
+    @Query("UPDATE habits SET name = :name, reminderTime = :reminderTime, scheduledDays = :scheduledDays WHERE id = :id")
+    suspend fun updateHabitDetailsWithSchedule(id: String, name: String, reminderTime: String, scheduledDays: List<DayOfWeek>)
 }

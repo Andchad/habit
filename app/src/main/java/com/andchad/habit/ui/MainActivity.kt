@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -20,7 +21,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
-import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -32,7 +32,9 @@ import com.andchad.habit.ui.screens.HabitListScreen
 import com.andchad.habit.ui.theme.HabitTheme
 import com.andchad.habit.utils.AdManager
 import dagger.hilt.android.AndroidEntryPoint
+import java.time.DayOfWeek
 import javax.inject.Inject
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -47,12 +49,14 @@ class MainActivity : ComponentActivity() {
         ActivityResultContracts.RequestPermission()
     ) { isGranted: Boolean ->
         if (isGranted) {
+            // Permission granted
             Toast.makeText(
                 this,
                 "Notifications enabled! You'll receive reminders for your habits.",
                 Toast.LENGTH_SHORT
             ).show()
         } else {
+            // Permission denied - show an explanation
             Toast.makeText(
                 this,
                 "Habit reminders won't work without notification permission. You can enable it in app settings.",
@@ -62,7 +66,6 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-
         // Apply the splash screen theme
         installSplashScreen()
 
@@ -79,6 +82,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
+                    // Create the app with injected dependencies
                     HabitApp(
                         viewModel = viewModel,
                         onShowAd = { adManager.showInterstitialAd(this) }
@@ -131,14 +135,19 @@ fun HabitApp(
             HabitListScreen(
                 habits = habits,
                 isDarkMode = isDarkMode,
+                adCounter = adCounter,
                 onToggleDarkMode = { viewModel.toggleDarkMode() },
                 onAddHabit = {
                     // Show ad occasionally when navigating to create a habit
                     adCounter++
+                    Log.d("AdTest", "Action performed. Ad counter: $adCounter/3")
+
                     if (adCounter >= 3) { // Show ad every 3 actions
+                        Log.d("AdTest", "Triggering ad display")
                         onShowAd()
                         adCounter = 0
                     }
+
                     navController.navigate("add_habit") {
                         // Navigation options for stability
                         launchSingleTop = true
@@ -164,8 +173,8 @@ fun HabitApp(
             AddEditHabitScreen(
                 habit = null,
                 viewModel = viewModel,
-                onSave = { name, reminderTime ->
-                    viewModel.createHabit(name, reminderTime)
+                onSave = { name, reminderTime, scheduledDays ->
+                    viewModel.createHabit(name, reminderTime, scheduledDays)
                     navController.popBackStack()
                 },
                 onBack = { navController.popBackStack() }
@@ -184,8 +193,8 @@ fun HabitApp(
             AddEditHabitScreen(
                 habit = habit,
                 viewModel = viewModel,
-                onSave = { name, reminderTime ->
-                    viewModel.updateHabit(habit.id, name, reminderTime)
+                onSave = { name, reminderTime, scheduledDays ->
+                    viewModel.updateHabit(habit.id, name, reminderTime, scheduledDays)
                     navController.popBackStack()
                 },
                 onBack = { navController.popBackStack() }

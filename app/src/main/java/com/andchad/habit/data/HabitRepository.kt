@@ -9,11 +9,12 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import java.time.DayOfWeek
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.launch
 
 @Singleton
 class HabitRepository @Inject constructor(
@@ -44,12 +45,13 @@ class HabitRepository @Inject constructor(
     }
 
     // Create a new habit
-    suspend fun createHabit(name: String, reminderTime: String): Habit {
+    suspend fun createHabit(name: String, reminderTime: String, scheduledDays: List<DayOfWeek>): Habit {
         val habitId = UUID.randomUUID().toString()
         val habit = Habit(
             id = habitId,
             name = name,
-            reminderTime = reminderTime
+            reminderTime = reminderTime,
+            scheduledDays = scheduledDays
         )
 
         // Add to local database
@@ -64,16 +66,18 @@ class HabitRepository @Inject constructor(
     }
 
     // Update habit details
-    suspend fun updateHabit(id: String, name: String, reminderTime: String) {
+    suspend fun updateHabit(id: String, name: String, reminderTime: String, scheduledDays: List<DayOfWeek>) {
         // Update in local database
-        habitDao.updateHabitDetails(id, name, reminderTime)
+        habitDao.updateHabitDetailsWithSchedule(id, name, reminderTime, scheduledDays)
 
         // Update in Firestore
+        val scheduledDaysInt = scheduledDays.map { it.value }
         habitsCollection.document(id)
             .update(
                 mapOf(
                     "name" to name,
-                    "reminderTime" to reminderTime
+                    "reminderTime" to reminderTime,
+                    "scheduledDays" to scheduledDaysInt
                 )
             )
             .await()

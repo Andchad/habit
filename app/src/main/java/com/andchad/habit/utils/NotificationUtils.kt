@@ -18,16 +18,19 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.Worker
 import androidx.work.WorkerParameters
-import dagger.assisted.Assisted
-import dagger.assisted.AssistedInject
 import com.andchad.habit.R
 import com.andchad.habit.ui.MainActivity
+import dagger.assisted.Assisted
+import dagger.assisted.AssistedInject
+import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
+import java.time.temporal.TemporalAdjusters
 import java.util.concurrent.TimeUnit
 
 object NotificationUtils {
@@ -36,44 +39,92 @@ object NotificationUtils {
     private const val CHANNEL_DESCRIPTION = "Notifications for your daily habits"
 
     fun createNotificationChannel(context: Context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val importance = NotificationManager.IMPORTANCE_HIGH
-            val channel = NotificationChannel(CHANNEL_ID, CHANNEL_NAME, importance).apply {
-                description = CHANNEL_DESCRIPTION
-            }
-
-            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            notificationManager.createNotificationChannel(channel)
+        val importance = NotificationManager.IMPORTANCE_HIGH
+        val channel = NotificationChannel(CHANNEL_ID, CHANNEL_NAME, importance).apply {
+            description = CHANNEL_DESCRIPTION
         }
+
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager.createNotificationChannel(channel)
     }
 
     fun scheduleHabitReminder(
         context: Context,
         habitId: String,
         habitName: String,
-        reminderTime: String
+        reminderTime: String,
+        scheduledDays: List<DayOfWeek>
     ) {
+        // Cancel any existing reminders for this habit
+        cancelHabitReminder(context, habitId)
+
+        // Parse the reminder time
         val time = LocalTime.parse(reminderTime, DateTimeFormatter.ofPattern("HH:mm"))
         val now = LocalDateTime.now()
-        val targetDateTime = LocalDateTime.of(
-            LocalDate.now(),
-            time
-        )
 
-        // If the time for today has already passed, schedule for tomorrow
-        val finalTargetDateTime = if (targetDateTime.isBefore(now)) {
-            targetDateTime.plusDays(1)
-        } else {
-            targetDateTime
+        // If no days are selected, don't schedule anything
+        if (scheduledDays.isEmpty()) {
+            return
         }
 
-        val delay = finalTargetDateTime.toInstant(ZoneOffset.UTC).toEpochMilli() -
-                now.toInstant(ZoneOffset.UTC).toEpochMilli()
+        // Find the next occurrence of any of the scheduled days
+        val nextReminderDate = findNextScheduledDate(now.toLocalDate(), time, scheduledDays)
 
+        // Prepare the input data
         val inputData = Data.Builder()
             .putString("habitId", habitId)
             .putString("habitName", habitName)
+            .putString("reminderTime", reminderTime)
+            .putStringArray("scheduledDays", scheduledDays.map { it.name }.toTypedArray())
             .build()
+
+        // Schedule the work
+        scheduleReminderWork(context, habitId, nextReminderDate, inputData)
+    }
+
+    private fun findNextScheduledDate(
+        fromDate: LocalDate,
+        time: LocalTime,
+        scheduledDays: List<DayOfWeek>
+    ): LocalDateTime {
+        val now = LocalDateTime.now()
+        val sortedDays = scheduledDays.sortedBy { it.value }
+
+        // Check if today is one of the scheduled days and time hasn't passed yet
+        if (sortedDays.contains(fromDate.dayOfWeek)) {
+            val todayDateTime = LocalDateTime.of(fromDate, time)
+            if (todayDateTime.isAfter(now)) {
+                return todayDateTime
+            }
+        }
+
+        // Find the next scheduled day
+        for (i in 1..7) { // Check the next 7 days
+            val nextDate = fromDate.plusDays(i.toLong())
+            if (sortedDays.contains(nextDate.dayOfWeek)) {
+                return LocalDateTime.of(nextDate, time)
+            }
+        }
+
+        // If we couldn't find a matching day in the next week, use the first scheduled day in the next week
+        val firstDayOfWeek = sortedDays.first()
+        val nextOccurrence = fromDate.with(TemporalAdjusters.next(firstDayOfWeek))
+        return LocalDateTime.of(nextOccurrence, time)
+    }
+
+    private fun scheduleReminderWork(
+        context: Context,
+        habitId: String,
+        dateTime: LocalDateTime,
+        inputData: Data
+    ) {
+        val now = LocalDateTime.now()
+        val delay = ChronoUnit.MILLIS.between(now, dateTime)
+
+        if (delay <= 0) {
+            // The time has already passed today, schedule for next occurrence
+            return
+        }
 
         val constraints = Constraints.Builder()
             .setRequiresBatteryNotLow(false)
@@ -98,6 +149,7 @@ object NotificationUtils {
     }
 }
 
+@HiltWorker
 class HabitReminderWorker @AssistedInject constructor(
     @Assisted private val context: Context,
     @Assisted workerParams: WorkerParameters
@@ -106,17 +158,31 @@ class HabitReminderWorker @AssistedInject constructor(
     override fun doWork(): Result {
         val habitId = inputData.getString("habitId") ?: return Result.failure()
         val habitName = inputData.getString("habitName") ?: return Result.failure()
+        val reminderTime = inputData.getString("reminderTime") ?: return Result.failure()
+        val scheduledDaysArray = inputData.getStringArray("scheduledDays")
 
         showNotification(habitId, habitName)
 
-        // Schedule the next reminder for tomorrow
-        val time = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"))
-        NotificationUtils.scheduleHabitReminder(
-            context,
-            habitId,
-            habitName,
-            time
-        )
+        // Schedule the next reminder
+        if (scheduledDaysArray != null && scheduledDaysArray.isNotEmpty()) {
+            val scheduledDays = scheduledDaysArray.mapNotNull { dayName ->
+                try {
+                    DayOfWeek.valueOf(dayName)
+                } catch (e: IllegalArgumentException) {
+                    null
+                }
+            }
+
+            if (scheduledDays.isNotEmpty()) {
+                NotificationUtils.scheduleHabitReminder(
+                    context,
+                    habitId,
+                    habitName,
+                    reminderTime,
+                    scheduledDays
+                )
+            }
+        }
 
         return Result.success()
     }

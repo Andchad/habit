@@ -5,6 +5,7 @@ import androidx.room.Room
 import com.andchad.habit.data.HabitDao
 import com.andchad.habit.data.HabitDatabase
 import com.andchad.habit.data.HabitRepository
+import com.andchad.habit.data.MIGRATION_1_2
 import com.andchad.habit.utils.AdManager
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ktx.firestore
@@ -29,7 +30,9 @@ object AppModule {
             context,
             HabitDatabase::class.java,
             "habits_database"
-        ).build()
+        )
+            .addMigrations(MIGRATION_1_2)
+            .build()
     }
 
     @Provides

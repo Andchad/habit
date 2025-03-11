@@ -109,6 +109,8 @@ dependencies {
 
     implementation ("androidx.webkit:webkit:1.6.1")
 
+    // Compose foundation pager (for wheel picker)
+    implementation("androidx.compose.foundation:foundation:1.5.4")
 
 }
 

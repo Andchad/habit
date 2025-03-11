@@ -1,5 +1,6 @@
 package com.andchad.habit.ui
 
+import android.annotation.SuppressLint
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -50,6 +51,7 @@ class HabitAdapter(
             }
         }
 
+        @SuppressLint("SetTextI18n")
         fun bind(habit: Habit) {
             nameTextView.text = habit.name
             timeTextView.text = "Reminder: ${habit.reminderTime}"

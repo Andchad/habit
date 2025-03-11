@@ -31,6 +31,7 @@ import com.andchad.habit.ui.screens.components.HabitItem
 fun HabitListScreen(
     habits: List<Habit>,
     isDarkMode: Boolean,
+    adCounter: Int,
     onToggleDarkMode: () -> Unit,
     onAddHabit: () -> Unit,
     onEditHabit: (Habit) -> Unit,
@@ -47,6 +48,13 @@ fun HabitListScreen(
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 ),
                 actions = {
+                    // Ad counter indicator
+                    Text(
+                        text = "Ad in: ${3 - adCounter}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
+
                     IconButton(onClick = onToggleDarkMode) {
                         Icon(
                             imageVector = if (isDarkMode) Icons.Default.LightMode else Icons.Default.DarkMode,
@@ -82,7 +90,8 @@ fun HabitListScreen(
                 )
             } else {
                 LazyColumn(
-                    contentPadding = PaddingValues(vertical = 8.dp)
+                    contentPadding = PaddingValues(vertical = 8.dp),
+                    modifier = Modifier.fillMaxSize()
                 ) {
                     items(
                         items = habits,

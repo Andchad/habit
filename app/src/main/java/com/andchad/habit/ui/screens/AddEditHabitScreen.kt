@@ -19,10 +19,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TimePickerState
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -34,8 +32,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.andchad.habit.data.model.Habit
 import com.andchad.habit.ui.HabitViewModel
-import com.andchad.habit.ui.screens.components.TimePickerDialog
+import com.andchad.habit.ui.screens.components.DaySelector
+import com.andchad.habit.ui.screens.components.WheelTimePicker
 import com.andchad.habit.ui.screens.components.formatTime
+import java.time.DayOfWeek
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.launch
@@ -45,7 +45,7 @@ import kotlinx.coroutines.launch
 fun AddEditHabitScreen(
     habit: Habit?,
     viewModel: HabitViewModel,
-    onSave: (String, String) -> Unit,
+    onSave: (String, String, List<DayOfWeek>) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -57,6 +57,11 @@ fun AddEditHabitScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
+    // For day selection
+    var selectedDays by remember {
+        mutableStateOf(habit?.scheduledDays ?: emptyList<DayOfWeek>())
+    }
+
     // Parse the existing reminder time or use current time
     val initialTime = if (habit != null) {
         val time = LocalTime.parse(habit.reminderTime, DateTimeFormatter.ofPattern("HH:mm"))
@@ -66,24 +71,17 @@ fun AddEditHabitScreen(
         now.hour to now.minute
     }
 
-    val timePickerState = rememberTimePickerState(
-        initialHour = initialTime.first,
-        initialMinute = initialTime.second
-    )
-
     var selectedTime by remember {
         mutableStateOf(formatTime(initialTime.first, initialTime.second))
     }
 
     if (showTimePicker) {
-        TimePickerDialog(
-            timePickerState = timePickerState,
+        WheelTimePicker(
+            initialHour = initialTime.first,
+            initialMinute = initialTime.second,
             onCancel = { showTimePicker = false },
-            onConfirm = {
-                selectedTime = formatTime(
-                    timePickerState.hour,
-                    timePickerState.minute
-                )
+            onConfirm = { hour, minute ->
+                selectedTime = formatTime(hour, minute)
                 showTimePicker = false
             }
         )
@@ -154,6 +152,21 @@ fun AddEditHabitScreen(
                 }
             )
 
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Day selector
+            DaySelector(
+                selectedDays = selectedDays,
+                onDaySelected = { day ->
+                    selectedDays = if (selectedDays.contains(day)) {
+                        selectedDays - day
+                    } else {
+                        selectedDays + day
+                    }
+                },
+                modifier = Modifier.fillMaxWidth()
+            )
+
             Spacer(modifier = Modifier.height(32.dp))
 
             Button(
@@ -163,10 +176,17 @@ fun AddEditHabitScreen(
                         return@Button
                     }
 
+                    if (selectedDays.isEmpty()) {
+                        scope.launch {
+                            snackbarHostState.showSnackbar("Please select at least one day for your habit")
+                        }
+                        return@Button
+                    }
+
                     scope.launch {
                         // Skip duplicate check when editing and name hasn't changed
                         if (isEditing && name == originalName) {
-                            onSave(name, selectedTime)
+                            onSave(name, selectedTime, selectedDays)
                             return@launch
                         }
 
@@ -177,7 +197,7 @@ fun AddEditHabitScreen(
                                 "A habit with this name already exists. Please use a different name."
                             )
                         } else {
-                            onSave(name, selectedTime)
+                            onSave(name, selectedTime, selectedDays)
                         }
                     }
                 },

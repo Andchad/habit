@@ -3,6 +3,7 @@ package com.andchad.habit.utils
 import android.app.Activity
 import android.content.Context
 import android.util.Log
+import android.widget.Toast
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
@@ -33,16 +34,20 @@ class AdManager @Inject constructor(private val context: Context) {
     private var interstitialAd: InterstitialAd? = null
     private val isAdLoading = AtomicBoolean(false)
 
-    // Ad Unit ID - Replace with your actual Ad Unit ID
+    // Ad Unit ID - Using test ID
     private val adUnitId = "ca-app-pub-2939318428995466~9181390448"
 
     fun initialize() {
-        MobileAds.initialize(context) { initStatus ->
-            Log.d(TAG, "MobileAds initialization status: $initStatus")
-            loadInterstitialAd()
-        }
+        try {
+            MobileAds.initialize(context) { initStatus ->
+                Log.d(TAG, "MobileAds initialization status: $initStatus")
+                loadInterstitialAd()
+            }
 
-        scheduleAdDisplayJob(context)
+            scheduleAdDisplayJob(context)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error initializing AdMob: ${e.message}", e)
+        }
     }
 
     private fun loadInterstitialAd() {
@@ -87,15 +92,26 @@ class AdManager @Inject constructor(private val context: Context) {
     }
 
     fun showInterstitialAd(activity: Activity) {
-        if (shouldShowAd()) {
-            // Show ad if available
-            if (interstitialAd != null) {
-                interstitialAd?.show(activity)
-                updateLastAdShownTime()
+        try {
+            if (shouldShowAd()) {
+                // Show ad if available
+                if (interstitialAd != null) {
+                    Log.d(TAG, "Showing interstitial ad")
+                    Toast.makeText(context, "Showing ad", Toast.LENGTH_SHORT).show()
+                    interstitialAd?.show(activity)
+                    updateLastAdShownTime()
+                } else {
+                    // If ad is not loaded, try to load it for next time
+                    Log.d(TAG, "Ad not loaded yet, attempting to load")
+                    Toast.makeText(context, "Ad would show now (not loaded yet)", Toast.LENGTH_SHORT).show()
+                    loadInterstitialAd()
+                }
             } else {
-                // If ad is not loaded, try to load it for next time
-                loadInterstitialAd()
+                Log.d(TAG, "Not time to show ad yet")
+                Toast.makeText(context, "Ad check: Not time to show yet", Toast.LENGTH_SHORT).show()
             }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error showing ad: ${e.message}", e)
         }
     }
 
