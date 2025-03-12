@@ -1,9 +1,6 @@
 package com.andchad.habit.ui.screens.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.gestures.ScrollableState
-import androidx.compose.foundation.gestures.scrollable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,12 +20,12 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -38,6 +35,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 @Composable
@@ -47,32 +45,46 @@ fun WheelTimePicker(
     onCancel: () -> Unit,
     onConfirm: (hour: Int, minute: Int) -> Unit
 ) {
-    val hourListState = rememberLazyListState()
-    val minuteListState = rememberLazyListState()
-    val coroutineScope = rememberCoroutineScope()
+    // Store current selection
+    var selectedHour by remember { mutableStateOf(initialHour) }
+    var selectedMinute by remember { mutableStateOf(initialMinute) }
 
-    val selectedHour by remember {
-        derivedStateOf {
-            val index = hourListState.firstVisibleItemIndex
-            // Handle wraparound for hours
-            index.mod(24)
-        }
-    }
+    val hourItems = remember { List(24) { it } }
+    val minuteItems = remember { List(60) { it } }
 
-    val selectedMinute by remember {
-        derivedStateOf {
-            val index = minuteListState.firstVisibleItemIndex
-            // Handle wraparound for minutes
-            index.mod(60)
-        }
-    }
+    // Create padding for top and bottom
+    val visibleItems = 5
+    val extraItems = remember { List(visibleItems / 2) { -1 } }
 
-    // Set initial scroll position
+    // Create list states
+    val hourState = rememberLazyListState()
+    val minuteState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+
+    // Initialize scroll positions
     LaunchedEffect(Unit) {
-        // For hours, we multiply by a large number to simulate infinite scrolling
-        hourListState.scrollToItem(initialHour + 24 * 1000)
-        // For minutes, we do the same
-        minuteListState.scrollToItem(initialMinute + 60 * 1000)
+        hourState.scrollToItem(initialHour, 0)
+        minuteState.scrollToItem(initialMinute, 0)
+    }
+
+    // Track hour selection changes
+    LaunchedEffect(hourState) {
+        snapshotFlow { hourState.firstVisibleItemIndex }
+            .collectLatest { index ->
+                if (index >= 0 && index < hourItems.size) {
+                    selectedHour = hourItems[index]
+                }
+            }
+    }
+
+    // Track minute selection changes
+    LaunchedEffect(minuteState) {
+        snapshotFlow { minuteState.firstVisibleItemIndex }
+            .collectLatest { index ->
+                if (index >= 0 && index < minuteItems.size) {
+                    selectedMinute = minuteItems[index]
+                }
+            }
     }
 
     Dialog(onDismissRequest = onCancel) {
@@ -97,146 +109,137 @@ fun WheelTimePicker(
                 Text(
                     text = "Select Time",
                     style = MaterialTheme.typography.headlineSmall,
-                    modifier = Modifier.padding(bottom = 24.dp)
+                    modifier = Modifier.padding(bottom = 16.dp)
                 )
 
-                // Display the currently selected time prominently
+                // Current selection display
+                Text(
+                    text = String.format("%02d:%02d", selectedHour, selectedMinute),
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+
+                // Wheels
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 16.dp),
+                        .padding(vertical = 8.dp),
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     // Hours wheel
-                    Box(
-                        modifier = Modifier
-                            .width(80.dp)
-                            .height(150.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        // Selection indicator
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(50.dp)
-                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
-                                .align(Alignment.Center)
-                        )
+                    PickerWheel(
+                        items = hourItems,
+                        listState = hourState,
+                        formatText = { String.format("%02d", it) },
+                        modifier = Modifier.width(70.dp)
+                    )
 
-                        // The scrollable list of hours
-                        LazyColumn(
-                            state = hourListState,
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier.fillMaxWidth(),
-                            userScrollEnabled = true
-                        ) {
-                            // We create a large list to simulate infinite scrolling
-                            items(count = 24 * 2000) { index ->
-                                val hour = index.mod(24)
-                                val isSelected = selectedHour == hour
-
-                                Box(
-                                    modifier = Modifier
-                                        .height(50.dp)
-                                        .fillMaxWidth(),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = String.format("%02d", hour),
-                                        fontSize = if (isSelected) 32.sp else 20.sp,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                        textAlign = TextAlign.Center,
-                                        modifier = Modifier
-                                            .alpha(if (isSelected) 1f else 0.6f)
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    // Separator
                     Text(
                         text = ":",
-                        fontSize = 32.sp,
+                        fontSize = 24.sp,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(horizontal = 8.dp)
                     )
 
                     // Minutes wheel
-                    Box(
-                        modifier = Modifier
-                            .width(80.dp)
-                            .height(150.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        // Selection indicator
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(50.dp)
-                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
-                                .align(Alignment.Center)
-                        )
-
-                        // The scrollable list of minutes
-                        LazyColumn(
-                            state = minuteListState,
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier.fillMaxWidth(),
-                            userScrollEnabled = true
-                        ) {
-                            // We create a large list to simulate infinite scrolling
-                            items(count = 60 * 2000) { index ->
-                                val minute = index.mod(60)
-                                val isSelected = selectedMinute == minute
-
-                                Box(
-                                    modifier = Modifier
-                                        .height(50.dp)
-                                        .fillMaxWidth(),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = String.format("%02d", minute),
-                                        fontSize = if (isSelected) 32.sp else 20.sp,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                        textAlign = TextAlign.Center,
-                                        modifier = Modifier
-                                            .alpha(if (isSelected) 1f else 0.6f)
-                                    )
-                                }
-                            }
-                        }
-                    }
+                    PickerWheel(
+                        items = minuteItems,
+                        listState = minuteState,
+                        formatText = { String.format("%02d", it) },
+                        modifier = Modifier.width(70.dp)
+                    )
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
                 // Buttons
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
                     horizontalArrangement = Arrangement.End
                 ) {
-                    TextButton(
-                        onClick = onCancel,
-                        modifier = Modifier.padding(end = 8.dp)
-                    ) {
-                        Text(
-                            "Cancel",
-                            color = MaterialTheme.colorScheme.primary
-                        )
+                    TextButton(onClick = onCancel) {
+                        Text("Cancel")
                     }
+
+                    Spacer(modifier = Modifier.width(8.dp))
 
                     TextButton(
                         onClick = { onConfirm(selectedHour, selectedMinute) }
                     ) {
-                        Text(
-                            "OK",
-                            color = MaterialTheme.colorScheme.primary
-                        )
+                        Text("OK")
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PickerWheel(
+    items: List<Int>,
+    listState: androidx.compose.foundation.lazy.LazyListState,
+    formatText: (Int) -> String,
+    modifier: Modifier = Modifier
+) {
+    val itemHeight = 50.dp
+    val visibleItems = 3 // Number of visible items (should be odd)
+
+    Box(
+        modifier = modifier.height(itemHeight * visibleItems),
+        contentAlignment = Alignment.Center
+    ) {
+        // Background highlight for the selected item
+        Box(
+            modifier = Modifier
+                .height(itemHeight)
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f))
+                .align(Alignment.Center)
+        )
+
+        // The wheel itself
+        LazyColumn(
+            state = listState,
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.fillMaxWidth(),
+            userScrollEnabled = true
+        ) {
+            // Add padding items at top
+            items(visibleItems / 2) {
+                Spacer(modifier = Modifier.height(itemHeight))
+            }
+
+            // Actual items
+            items(items.size) { index ->
+                val item = items[index]
+                val isSelected = index == listState.firstVisibleItemIndex
+
+                Box(
+                    modifier = Modifier
+                        .height(itemHeight)
+                        .fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = formatText(item),
+                        fontSize = if (isSelected) 22.sp else 18.sp,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                        textAlign = TextAlign.Center,
+                        color = if (isSelected)
+                            MaterialTheme.colorScheme.primary
+                        else
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    )
+                }
+            }
+
+            // Add padding items at bottom
+            items(visibleItems / 2) {
+                Spacer(modifier = Modifier.height(itemHeight))
             }
         }
     }
