@@ -4,9 +4,12 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -14,6 +17,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -27,6 +31,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -43,8 +48,10 @@ import com.andchad.habit.ui.screens.components.HabitItem
 fun HabitListScreen(
     habits: List<Habit>,
     isDarkMode: Boolean,
+    showTodayHabitsOnly: Boolean,
     adCounter: Int,
     onToggleDarkMode: () -> Unit,
+    onToggleHabitsFilter: () -> Unit,
     onAddHabit: () -> Unit,
     onEditHabit: (Habit) -> Unit,
     onDeleteHabit: (Habit) -> Unit,
@@ -67,6 +74,23 @@ fun HabitListScreen(
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 ),
                 actions = {
+                    // Today/All Toggle
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(end = 8.dp)
+                    ) {
+                        Text(
+                            text = "Today only",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        Switch(
+                            checked = showTodayHabitsOnly,
+                            onCheckedChange = { onToggleHabitsFilter() }
+                        )
+                    }
 
                     // Delete completed habits button
                     if (hasCompletedHabits) {
@@ -109,7 +133,10 @@ fun HabitListScreen(
         ) {
             if (habits.isEmpty()) {
                 Text(
-                    text = "No habits yet. Tap + to create your first habit!",
+                    text = if (showTodayHabitsOnly)
+                        "No habits scheduled for today. Tap + to create a habit!"
+                    else
+                        "No habits yet. Tap + to create your first habit!",
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.align(Alignment.Center)
                 )

@@ -18,6 +18,8 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import java.time.DayOfWeek
 import javax.inject.Inject
+import kotlinx.coroutines.flow.combine
+import java.time.LocalDate
 
 @HiltViewModel
 class HabitViewModel @Inject constructor(
@@ -32,38 +34,80 @@ class HabitViewModel @Inject constructor(
     private val _isDarkMode = MutableStateFlow(false)
     val isDarkMode: StateFlow<Boolean> = _isDarkMode.asStateFlow()
 
+    // Add state for showing today's habits only
+    private val _showTodayHabitsOnly = MutableStateFlow(false)
+    val showTodayHabitsOnly: StateFlow<Boolean> = _showTodayHabitsOnly.asStateFlow()
+
     // Store custom sort order
     private val _habitOrder = MutableStateFlow<List<String>>(emptyList())
+
+    // Store all unfiltered habits
+    private val _allHabits = MutableStateFlow<List<Habit>>(emptyList())
 
     init {
         // Observe habits from repository
         viewModelScope.launch {
             habitRepository.getHabits().collect { habitsList ->
-                if (_habitOrder.value.isEmpty()) {
-                    // Initialize habit order if empty
-                    _habitOrder.value = habitsList.map { it.id }
-                } else {
-                    // Update order with any new habits
-                    val currentOrder = _habitOrder.value.toMutableList()
-                    habitsList.forEach { habit ->
-                        if (!currentOrder.contains(habit.id)) {
-                            currentOrder.add(habit.id)
-                        }
-                    }
-                    // Remove IDs of deleted habits
-                    val existingIds = habitsList.map { it.id }
-                    _habitOrder.value = currentOrder.filter { existingIds.contains(it) }
-                }
+                // Store all habits
+                _allHabits.value = habitsList
 
-                // Sort habits according to user order
-                val sortedHabits = habitsList.sortedBy { habit ->
-                    _habitOrder.value.indexOf(habit.id).let {
-                        if (it >= 0) it else Int.MAX_VALUE
-                    }
-                }
-                _habits.value = sortedHabits
+                // Apply order and filtering
+                applyHabitsFilter()
             }
         }
+
+        // Reapply filter when the filter mode changes
+        viewModelScope.launch {
+            _showTodayHabitsOnly.collect {
+                applyHabitsFilter()
+            }
+        }
+    }
+
+    // Function to toggle between today's habits and all habits
+    fun toggleHabitsFilter() {
+        _showTodayHabitsOnly.value = !_showTodayHabitsOnly.value
+    }
+
+    // Apply filtering and sorting to habits
+    private fun applyHabitsFilter() {
+        val habitsList = _allHabits.value
+
+        // Update order with any new habits
+        if (_habitOrder.value.isEmpty()) {
+            // Initialize habit order if empty
+            _habitOrder.value = habitsList.map { it.id }
+        } else {
+            // Update order with any new habits
+            val currentOrder = _habitOrder.value.toMutableList()
+            habitsList.forEach { habit ->
+                if (!currentOrder.contains(habit.id)) {
+                    currentOrder.add(habit.id)
+                }
+            }
+            // Remove IDs of deleted habits
+            val existingIds = habitsList.map { it.id }
+            _habitOrder.value = currentOrder.filter { existingIds.contains(it) }
+        }
+
+        // Filter for today if needed
+        val filteredList = if (_showTodayHabitsOnly.value) {
+            val today = LocalDate.now().dayOfWeek
+            habitsList.filter { habit ->
+                habit.scheduledDays.contains(today)
+            }
+        } else {
+            habitsList
+        }
+
+        // Sort habits according to user order
+        val sortedHabits = filteredList.sortedBy { habit ->
+            _habitOrder.value.indexOf(habit.id).let {
+                if (it >= 0) it else Int.MAX_VALUE
+            }
+        }
+
+        _habits.value = sortedHabits
     }
 
     // Check if a habit with this name already exists
@@ -111,7 +155,7 @@ class HabitViewModel @Inject constructor(
             )
 
             // Update alarm
-            val habit = _habits.value.find { it.id == id }
+            val habit = _allHabits.value.find { it.id == id }
             if (habit != null) {
                 // Cancel the existing alarm
                 alarmUtils.cancelAlarm(habit.id)
@@ -133,7 +177,7 @@ class HabitViewModel @Inject constructor(
             habitRepository.updateVibrationSetting(id, vibrationEnabled)
 
             // Update alarm
-            val habit = _habits.value.find { it.id == id } ?: return@launch
+            val habit = _allHabits.value.find { it.id == id } ?: return@launch
             alarmUtils.cancelAlarm(habit.id)
             scheduleHabitAlarm(habit.copy(vibrationEnabled = vibrationEnabled))
         }
@@ -144,7 +188,7 @@ class HabitViewModel @Inject constructor(
             habitRepository.updateSnoozeSetting(id, snoozeEnabled)
 
             // Update alarm
-            val habit = _habits.value.find { it.id == id } ?: return@launch
+            val habit = _allHabits.value.find { it.id == id } ?: return@launch
             alarmUtils.cancelAlarm(habit.id)
             scheduleHabitAlarm(habit.copy(snoozeEnabled = snoozeEnabled))
         }
@@ -159,7 +203,7 @@ class HabitViewModel @Inject constructor(
                 alarmUtils.cancelAlarm(id)
             } else {
                 // Re-schedule alarm if marked as not completed
-                val habit = _habits.value.find { it.id == id }
+                val habit = _allHabits.value.find { it.id == id }
                 if (habit != null) {
                     scheduleHabitAlarm(habit.copy(isCompleted = false))
                 }

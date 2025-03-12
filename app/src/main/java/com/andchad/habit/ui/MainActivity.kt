@@ -106,6 +106,7 @@ fun HabitApp(
     val navController = rememberNavController()
     val habits by viewModel.habits.collectAsState()
     val isDarkMode by viewModel.isDarkMode.collectAsState()
+    val showTodayHabitsOnly by viewModel.showTodayHabitsOnly.collectAsState()
 
     // Counter to limit ad frequency
     var adCounter by remember { mutableStateOf(0) }
@@ -118,8 +119,10 @@ fun HabitApp(
             HabitListScreen(
                 habits = habits,
                 isDarkMode = isDarkMode,
+                showTodayHabitsOnly = showTodayHabitsOnly,
                 adCounter = adCounter,
                 onToggleDarkMode = { viewModel.toggleDarkMode() },
+                onToggleHabitsFilter = { viewModel.toggleHabitsFilter() },
                 onAddHabit = {
                     // Show ad occasionally when navigating to create a habit
                     adCounter++
