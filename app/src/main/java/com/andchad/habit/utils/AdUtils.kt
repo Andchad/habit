@@ -97,18 +97,16 @@ class AdManager @Inject constructor(private val context: Context) {
                 // Show ad if available
                 if (interstitialAd != null) {
                     Log.d(TAG, "Showing interstitial ad")
-                    Toast.makeText(context, "Showing ad", Toast.LENGTH_SHORT).show()
                     interstitialAd?.show(activity)
                     updateLastAdShownTime()
                 } else {
                     // If ad is not loaded, try to load it for next time
                     Log.d(TAG, "Ad not loaded yet, attempting to load")
-                    Toast.makeText(context, "Ad would show now (not loaded yet)", Toast.LENGTH_SHORT).show()
                     loadInterstitialAd()
                 }
             } else {
                 Log.d(TAG, "Not time to show ad yet")
-                Toast.makeText(context, "Ad check: Not time to show yet", Toast.LENGTH_SHORT).show()
+
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error showing ad: ${e.message}", e)
