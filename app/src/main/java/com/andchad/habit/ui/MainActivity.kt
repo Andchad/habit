@@ -220,10 +220,9 @@ fun HabitApp(
                     onAddHabit = {
                         // Show ad occasionally when navigating to create a habit
                         adCounter++
-                        Log.d("AdTest", "Action performed. Ad counter: $adCounter/3")
 
                         if (adCounter >= 3) { // Show ad every 3 actions
-                            Log.d("AdTest", "Triggering ad display")
+
                             onShowAd()
                             adCounter = 0
                         }

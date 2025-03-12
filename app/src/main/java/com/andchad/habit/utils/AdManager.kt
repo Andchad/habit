@@ -2,8 +2,12 @@ package com.andchad.habit.utils
 
 import android.app.Activity
 import android.content.Context
-import android.util.Log
 import android.widget.Toast
+import androidx.work.Constraints
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.Worker
+import androidx.work.WorkerParameters
 import com.google.android.gms.ads.AdError
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.FullScreenContentCallback
@@ -11,53 +15,44 @@ import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.MobileAds
 import com.google.android.gms.ads.interstitial.InterstitialAd
 import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Singleton
 
-private const val TAG = "AdManager"
+// This shared preference key will store the timestamp of the last ad shown
+private const val PREFS_NAME = "ad_prefs"
+private const val LAST_AD_SHOWN_KEY = "last_ad_shown"
+
+// Ad should be shown 3 times a day = every 8 hours
+private const val AD_INTERVAL_HOURS = 8L
 
 @Singleton
 class AdManager @Inject constructor(private val context: Context) {
     private var interstitialAd: InterstitialAd? = null
     private val isAdLoading = AtomicBoolean(false)
-    private var isInitialized = false
 
-    // Using Google's test ad unit ID
-    private val adUnitId = "ca-app-pub-3940256099942544/1033173712" // Test interstitial ad unit ID
+    // Ad Unit ID - Using test ID
+    private val adUnitId = "ca-app-pub-2939318428995466~9181390448"
 
     fun initialize() {
-        if (isInitialized) return
-
         try {
-            Log.d(TAG, "Starting MobileAds initialization")
             MobileAds.initialize(context) { initStatus ->
-                Log.d(TAG, "MobileAds initialization complete with status: $initStatus")
-                isInitialized = true
-
-                // Immediately load an ad after initialization
                 loadInterstitialAd()
             }
+
+            scheduleAdDisplayJob(context)
         } catch (e: Exception) {
-            Log.e(TAG, "Error initializing AdMob: ${e.message}", e)
+            // Error handling without logging
         }
     }
 
     private fun loadInterstitialAd() {
-        // Don't try to load if already loading or loaded
-        if (interstitialAd != null) {
-            Log.d(TAG, "Ad already loaded, skipping loading")
-            return
-        }
-
-        if (isAdLoading.get()) {
-            Log.d(TAG, "Ad is currently loading, skipping duplicate load")
+        if (interstitialAd != null || isAdLoading.get()) {
             return
         }
 
         isAdLoading.set(true)
-        Log.d(TAG, "Starting to load interstitial ad with adUnitId: $adUnitId")
-
         val adRequest = AdRequest.Builder().build()
 
         InterstitialAd.load(
@@ -66,42 +61,23 @@ class AdManager @Inject constructor(private val context: Context) {
             adRequest,
             object : InterstitialAdLoadCallback() {
                 override fun onAdFailedToLoad(adError: LoadAdError) {
-                    Log.e(TAG, "Ad failed to load! Error code: ${adError.code}, " +
-                            "message: ${adError.message}, domain: ${adError.domain}, " +
-                            "cause: ${adError.cause}")
-
                     interstitialAd = null
                     isAdLoading.set(false)
-
-                    // Retry loading after a delay
-                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                        Log.d(TAG, "Retrying ad load after failure")
-                        loadInterstitialAd()
-                    }, 30000) // retry after 30 seconds
                 }
 
                 override fun onAdLoaded(ad: InterstitialAd) {
-                    Log.d(TAG, "Ad loaded successfully! 🎉")
                     interstitialAd = ad
                     isAdLoading.set(false)
 
+                    // Set the full screen content callback
                     interstitialAd?.fullScreenContentCallback = object : FullScreenContentCallback() {
                         override fun onAdDismissedFullScreenContent() {
-                            Log.d(TAG, "Ad was dismissed")
                             interstitialAd = null
-
-                            // Load the next ad immediately
-                            loadInterstitialAd()
+                            loadInterstitialAd() // Reload ad for next time
                         }
 
                         override fun onAdFailedToShowFullScreenContent(adError: AdError) {
-                            Log.e(TAG, "Ad failed to show: ${adError.message}")
                             interstitialAd = null
-                            loadInterstitialAd()
-                        }
-
-                        override fun onAdShowedFullScreenContent() {
-                            Log.d(TAG, "Ad showed fullscreen content successfully")
                         }
                     }
                 }
@@ -111,42 +87,72 @@ class AdManager @Inject constructor(private val context: Context) {
 
     fun showInterstitialAd(activity: Activity) {
         try {
-            if (interstitialAd != null) {
-                Log.d(TAG, "Showing interstitial ad")
-                interstitialAd?.show(activity)
-            } else {
-                Log.d(TAG, "Ad not ready yet, attempting to load")
-
-                // Debug info
-                if (!isInitialized) {
-                    Log.e(TAG, "MobileAds not initialized yet!")
-                    Toast.makeText(context, "Ad SDK not initialized", Toast.LENGTH_SHORT).show()
-                    initialize()
-                } else if (isAdLoading.get()) {
-                    Log.d(TAG, "Ad is still loading, please wait")
-                    Toast.makeText(context, "Ad is still loading...", Toast.LENGTH_SHORT).show()
+            if (shouldShowAd()) {
+                // Show ad if available
+                if (interstitialAd != null) {
+                    interstitialAd?.show(activity)
+                    updateLastAdShownTime()
                 } else {
-                    Log.d(TAG, "No ad available and not currently loading, starting new load")
-                    Toast.makeText(context, "Loading new ad...", Toast.LENGTH_SHORT).show()
+                    // If ad is not loaded, try to load it for next time
                     loadInterstitialAd()
                 }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error showing ad: ${e.message}", e)
-            Toast.makeText(context, "Error with ad: ${e.message}", Toast.LENGTH_SHORT).show()
+            // Error handling without logging
+        }
+    }
 
-            // Reset and try to reload
-            interstitialAd = null
-            isAdLoading.set(false)
+    // Ensure an ad is loaded when app resumes
+    fun ensureAdLoaded() {
+        if (interstitialAd == null && !isAdLoading.get()) {
             loadInterstitialAd()
         }
     }
 
-    // Call this in MainActivity's onResume to ensure we always have an ad ready
-    fun ensureAdLoaded() {
-        if (interstitialAd == null && !isAdLoading.get()) {
-            Log.d(TAG, "Preloading ad in onResume")
-            loadInterstitialAd()
-        }
+    private fun shouldShowAd(): Boolean {
+        //TODO chose to show ads or not
+        return false;
+//        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+//        val lastAdShown = prefs.getLong(LAST_AD_SHOWN_KEY, 0)
+//        val currentTime = System.currentTimeMillis()
+//
+//        // Check if AD_INTERVAL_HOURS have passed since the last ad
+//        return currentTime - lastAdShown >= TimeUnit.HOURS.toMillis(AD_INTERVAL_HOURS)
+    }
+
+    private fun updateLastAdShownTime() {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putLong(LAST_AD_SHOWN_KEY, System.currentTimeMillis()).apply()
+    }
+
+    // Schedule periodic work to check and potentially show ads
+    private fun scheduleAdDisplayJob(context: Context) {
+        val constraints = Constraints.Builder()
+            .setRequiresBatteryNotLow(true)
+            .build()
+
+        val adWorkRequest = PeriodicWorkRequestBuilder<AdDisplayWorker>(
+            AD_INTERVAL_HOURS, TimeUnit.HOURS
+        )
+            .setConstraints(constraints)
+            .build()
+
+        androidx.work.WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+            "ad_display_work",
+            ExistingPeriodicWorkPolicy.KEEP,
+            adWorkRequest
+        )
+    }
+}
+
+class AdDisplayWorker(
+    private val context: Context,
+    workerParams: WorkerParameters
+) : Worker(context, workerParams) {
+
+    override fun doWork(): Result {
+        // This just notifies the app that it's time to consider showing an ad
+        // The actual ad display will happen in the app when the user interacts with it
+        return Result.success()
     }
 }
