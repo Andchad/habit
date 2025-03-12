@@ -52,30 +52,13 @@ class AlarmReceiver : BroadcastReceiver() {
 
         context.startActivity(alarmIntent)
 
-        // Play alarm sound
-        playAlarmSound(context)
-
-        // Vibrate if enabled
+        // Vibrate if enabled - keep this functionality here
         if (vibrationEnabled) {
             vibrate(context)
         }
-    }
 
-    private fun playAlarmSound(context: Context) {
-        try {
-            val ringtoneUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-            val ringtone = RingtoneManager.getRingtone(context, ringtoneUri)
-            ringtone.play()
-
-            // Stop the ringtone after 30 seconds if not stopped manually
-            Handler(Looper.getMainLooper()).postDelayed({
-                if (ringtone.isPlaying) {
-                    ringtone.stop()
-                }
-            }, 30000) // 30 seconds
-        } catch (e: Exception) {
-            Log.e(TAG, "Error playing alarm sound: ${e.message}")
-        }
+        // NOTE: Removed playAlarmSound method call from here
+        // Let AlarmActivity handle playing and stopping the sound
     }
 
     private fun vibrate(context: Context) {

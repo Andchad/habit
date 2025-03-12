@@ -3,6 +3,7 @@ package com.andchad.habit.ui
 import android.media.MediaPlayer
 import android.media.RingtoneManager
 import android.os.Bundle
+import android.util.Log
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -45,6 +46,12 @@ class AlarmActivity : ComponentActivity() {
     lateinit var alarmUtils: AlarmUtils
 
     private var mediaPlayer: MediaPlayer? = null
+    private val TAG = "AlarmActivity"
+
+    companion object {
+        // Static variable to track if this activity is in the foreground
+        private var isActivityVisible = false
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -90,8 +97,23 @@ class AlarmActivity : ComponentActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        isActivityVisible = true
+    }
+
+    override fun onPause() {
+        super.onPause()
+        isActivityVisible = false
+    }
+
     private fun playAlarmSound() {
         try {
+            // Make sure we're not creating multiple media players
+            if (mediaPlayer != null) {
+                stopAlarmSound()
+            }
+
             val alarmSound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
             mediaPlayer = MediaPlayer().apply {
                 setDataSource(this@AlarmActivity, alarmSound)
@@ -99,24 +121,38 @@ class AlarmActivity : ComponentActivity() {
                 prepare()
                 start()
             }
+            Log.d(TAG, "Started playing alarm sound")
         } catch (e: Exception) {
+            Log.e(TAG, "Error playing alarm sound: ${e.message}")
             e.printStackTrace()
         }
     }
 
     private fun stopAlarmSound() {
-        mediaPlayer?.apply {
-            if (isPlaying) {
-                stop()
+        try {
+            mediaPlayer?.apply {
+                if (isPlaying) {
+                    stop()
+                    Log.d(TAG, "Stopped alarm sound")
+                }
+                reset()
+                release()
             }
-            release()
+            mediaPlayer = null
+        } catch (e: Exception) {
+            Log.e(TAG, "Error stopping alarm sound: ${e.message}")
         }
-        mediaPlayer = null
     }
 
     override fun onDestroy() {
         stopAlarmSound()
         super.onDestroy()
+    }
+
+    override fun onBackPressed() {
+        // Stop sound and finish when back is pressed
+        stopAlarmSound()
+        super.onBackPressed()
     }
 }
 
