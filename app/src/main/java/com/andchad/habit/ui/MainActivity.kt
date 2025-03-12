@@ -85,6 +85,13 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+
+        // Ensure an ad is loaded and ready to show
+        adManager.ensureAdLoaded()
+    }
+
     private fun requestAlarmPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             val alarmManager = getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
@@ -202,4 +209,5 @@ fun HabitApp(
             )
         }
     }
+
 }

@@ -99,7 +99,7 @@ fun HabitListScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Delete,
-                                contentDescription = "Delete Completed Habits"
+                                contentDescription = "Delete Selected Habits"
                             )
                         }
                     }
@@ -158,7 +158,7 @@ fun HabitListScreen(
                                 modifier = Modifier.padding(end = 8.dp)
                             )
                             Text(
-                                text = "Delete ${completedHabits.size} Completed ${if (completedHabits.size == 1) "Habit" else "Habits"}"
+                                text = "Delete ${completedHabits.size} selected ${if (completedHabits.size == 1) "Habit" else "Habits"}"
                             )
                         }
                     }
@@ -188,10 +188,10 @@ fun HabitListScreen(
     if (showDeleteConfirmation) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirmation = false },
-            title = { Text("Delete Completed Habits") },
+            title = { Text("Delete Selected Habits") },
             text = {
                 Text(
-                    "Are you sure you want to delete ${completedHabits.size} completed ${if (completedHabits.size == 1) "habit" else "habits"}?" +
+                    "Are you sure you want to delete ${completedHabits.size} selected ${if (completedHabits.size == 1) "habit" else "habits"}?" +
                             " This action cannot be undone."
                 )
             },
