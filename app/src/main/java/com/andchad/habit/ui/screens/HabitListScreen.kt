@@ -1,6 +1,5 @@
 package com.andchad.habit.ui.screens
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -15,38 +14,30 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DarkMode
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.LightMode
-import androidx.compose.material.icons.filled.FilterList
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.andchad.habit.data.model.Habit
-import com.andchad.habit.ui.screens.components.HabitItem
+import com.andchad.habit.ui.screens.components.HabitItemCard
+import com.andchad.habit.ui.screens.components.PastDueHabitList
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HabitListScreen(
-    habits: List<Habit>,
+    upcomingHabits: List<Habit>,
+    pastDueHabits: List<Habit>,
     isDarkMode: Boolean,
     showTodayHabitsOnly: Boolean,
     adCounter: Int,
@@ -55,16 +46,9 @@ fun HabitListScreen(
     onAddHabit: () -> Unit,
     onEditHabit: (Habit) -> Unit,
     onDeleteHabit: (Habit) -> Unit,
-    onDeleteCompletedHabits: (List<Habit>) -> Unit,
     onToggleCompleteHabit: (String, Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var showDeleteConfirmation by remember { mutableStateOf(false) }
-
-    // Get completed habits
-    val completedHabits = habits.filter { it.isCompleted }
-    val hasCompletedHabits = completedHabits.isNotEmpty()
-
     Scaffold(
         topBar = {
             TopAppBar(
@@ -90,18 +74,6 @@ fun HabitListScreen(
                             checked = showTodayHabitsOnly,
                             onCheckedChange = { onToggleHabitsFilter() }
                         )
-                    }
-
-                    // Delete completed habits button
-                    if (hasCompletedHabits) {
-                        IconButton(
-                            onClick = { showDeleteConfirmation = true }
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Delete,
-                                contentDescription = "Delete Selected Habits"
-                            )
-                        }
                     }
 
                     IconButton(onClick = onToggleDarkMode) {
@@ -131,12 +103,12 @@ fun HabitListScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            if (habits.isEmpty()) {
+            if (upcomingHabits.isEmpty() && pastDueHabits.isEmpty()) {
                 Text(
                     text = if (showTodayHabitsOnly)
-                        "No habits scheduled for today. Tap + to create a habit!"
+                        "No upcoming habits scheduled for today. Tap + to create a habit!"
                     else
-                        "No habits yet. Tap + to create your first habit!",
+                        "No upcoming habits scheduled. Tap + to create a habit!",
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.align(Alignment.Center)
                 )
@@ -144,74 +116,42 @@ fun HabitListScreen(
                 Column(
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    if (hasCompletedHabits) {
-                        Button(
-                            onClick = { showDeleteConfirmation = true },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 8.dp),
-                            enabled = hasCompletedHabits
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Delete,
-                                contentDescription = null,
-                                modifier = Modifier.padding(end = 8.dp)
-                            )
-                            Text(
-                                text = "Delete ${completedHabits.size} selected ${if (completedHabits.size == 1) "Habit" else "Habits"}"
-                            )
-                        }
+                    // First show any past due habits with a completion opportunity
+                    if (pastDueHabits.isNotEmpty()) {
+                        PastDueHabitList(
+                            pastDueHabits = pastDueHabits,
+                            onToggleComplete = onToggleCompleteHabit,
+                            modifier = Modifier.fillMaxWidth()
+                        )
                     }
 
-                    LazyColumn(
-                        contentPadding = PaddingValues(vertical = 8.dp),
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        items(
-                            items = habits,
-                            key = { it.id }
-                        ) { habit ->
-                            HabitItem(
-                                habit = habit,
-                                onEdit = onEditHabit,
-                                onDelete = onDeleteHabit,
-                                onToggleComplete = onToggleCompleteHabit
-                            )
+                    // Then show upcoming habits
+                    if (upcomingHabits.isNotEmpty()) {
+                        Text(
+                            text = "Upcoming Habits",
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                        )
+
+                        LazyColumn(
+                            contentPadding = PaddingValues(vertical = 8.dp),
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            items(
+                                items = upcomingHabits,
+                                key = { it.id }
+                            ) { habit ->
+                                HabitItemCard(
+                                    habit = habit,
+                                    onEdit = onEditHabit,
+                                    onDelete = onDeleteHabit,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
                         }
                     }
                 }
             }
         }
-    }
-
-    // Confirmation dialog
-    if (showDeleteConfirmation) {
-        AlertDialog(
-            onDismissRequest = { showDeleteConfirmation = false },
-            title = { Text("Delete Selected Habits") },
-            text = {
-                Text(
-                    "Are you sure you want to delete ${completedHabits.size} selected ${if (completedHabits.size == 1) "habit" else "habits"}?" +
-                            " This action cannot be undone."
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        onDeleteCompletedHabits(completedHabits)
-                        showDeleteConfirmation = false
-                    }
-                ) {
-                    Text("Delete")
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = { showDeleteConfirmation = false }
-                ) {
-                    Text("Cancel")
-                }
-            }
-        )
     }
 }

@@ -50,7 +50,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HabitItem(
+fun HabitItemCard(
     habit: Habit,
     onEdit: (Habit) -> Unit,
     onDelete: (Habit) -> Unit,

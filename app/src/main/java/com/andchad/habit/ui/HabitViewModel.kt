@@ -69,46 +69,7 @@ class HabitViewModel @Inject constructor(
         _showTodayHabitsOnly.value = !_showTodayHabitsOnly.value
     }
 
-    // Apply filtering and sorting to habits
-    private fun applyHabitsFilter() {
-        val habitsList = _allHabits.value
 
-        // Update order with any new habits
-        if (_habitOrder.value.isEmpty()) {
-            // Initialize habit order if empty
-            _habitOrder.value = habitsList.map { it.id }
-        } else {
-            // Update order with any new habits
-            val currentOrder = _habitOrder.value.toMutableList()
-            habitsList.forEach { habit ->
-                if (!currentOrder.contains(habit.id)) {
-                    currentOrder.add(habit.id)
-                }
-            }
-            // Remove IDs of deleted habits
-            val existingIds = habitsList.map { it.id }
-            _habitOrder.value = currentOrder.filter { existingIds.contains(it) }
-        }
-
-        // Filter for today if needed
-        val filteredList = if (_showTodayHabitsOnly.value) {
-            val today = LocalDate.now().dayOfWeek
-            habitsList.filter { habit ->
-                habit.scheduledDays.contains(today)
-            }
-        } else {
-            habitsList
-        }
-
-        // Sort habits according to user order
-        val sortedHabits = filteredList.sortedBy { habit ->
-            _habitOrder.value.indexOf(habit.id).let {
-                if (it >= 0) it else Int.MAX_VALUE
-            }
-        }
-
-        _habits.value = sortedHabits
-    }
 
     // Check if a habit with this name already exists
     suspend fun habitNameExists(name: String): Boolean {
@@ -161,13 +122,15 @@ class HabitViewModel @Inject constructor(
                 alarmUtils.cancelAlarm(habit.id)
 
                 // Schedule with the new details
-                scheduleHabitAlarm(habit.copy(
-                    name = name,
-                    reminderTime = reminderTime,
-                    scheduledDays = scheduledDays,
-                    vibrationEnabled = vibrationEnabled,
-                    snoozeEnabled = snoozeEnabled
-                ))
+                scheduleHabitAlarm(
+                    habit.copy(
+                        name = name,
+                        reminderTime = reminderTime,
+                        scheduledDays = scheduledDays,
+                        vibrationEnabled = vibrationEnabled,
+                        snoozeEnabled = snoozeEnabled
+                    )
+                )
             }
         }
     }
@@ -248,5 +211,85 @@ class HabitViewModel @Inject constructor(
                 alarmUtils.cancelAlarm(habit.id)
             }
         }
+    }
+
+    private fun applyHabitsFilter() {
+        val habitsList = _allHabits.value
+
+        // Apply the order without filtering yet
+        if (_habitOrder.value.isEmpty()) {
+            // Initialize habit order if empty
+            _habitOrder.value = habitsList.map { it.id }
+        } else {
+            // Update order with any new habits
+            val currentOrder = _habitOrder.value.toMutableList()
+            habitsList.forEach { habit ->
+                if (!currentOrder.contains(habit.id)) {
+                    currentOrder.add(habit.id)
+                }
+            }
+            // Remove IDs of deleted habits
+            val existingIds = habitsList.map { it.id }
+            _habitOrder.value = currentOrder.filter { existingIds.contains(it) }
+        }
+
+        // Filter for today if needed but DON'T filter by upcoming status
+        val filteredList = if (_showTodayHabitsOnly.value) {
+            val today = LocalDate.now().dayOfWeek
+            habitsList.filter { habit ->
+                habit.scheduledDays.contains(today)
+            }
+        } else {
+            habitsList
+        }
+
+        // Sort habits according to user order
+        val sortedHabits = filteredList.sortedBy { habit ->
+            _habitOrder.value.indexOf(habit.id).let {
+                if (it >= 0) it else Int.MAX_VALUE
+            }
+        }
+
+        _habits.value = sortedHabits
+
+        // Log for debugging
+        android.util.Log.d("HabitViewModel", "Filtered habits: total=${_habits.value.size}, original=${habitsList.size}")
+    }
+
+    // This now returns "true" only for future habits
+    fun isHabitUpcoming(habit: Habit): Boolean {
+        try {
+            // Get the current date and day of week
+            val today = java.time.LocalDate.now()
+            val currentDayOfWeek = today.dayOfWeek
+            val now = java.time.LocalTime.now()
+
+            // Check if the habit is scheduled for a future day
+            if (habit.scheduledDays.any { it != currentDayOfWeek && isDateAfterToday(today, it) }) {
+                return true
+            }
+
+            // If scheduled for today, check if the time is in the future
+            if (habit.scheduledDays.contains(currentDayOfWeek)) {
+                val habitTime = habit.getReminderTimeAsLocalTime()
+                return habitTime.isAfter(now)
+            }
+
+            // If not scheduled for today or any future day, it's not upcoming
+            return false
+        } catch (e: Exception) {
+            android.util.Log.e("HabitViewModel", "Error checking if habit is upcoming: ${e.message}")
+            return false
+        }
+    }
+
+    // Add this method to check if a habit is past due
+    fun isHabitPastDue(habit: Habit): Boolean {
+        return !isHabitUpcoming(habit) && !habit.isCompleted
+    }
+
+    private fun isDateAfterToday(today: java.time.LocalDate, dayOfWeek: java.time.DayOfWeek): Boolean {
+        val daysUntilNext = (dayOfWeek.value - today.dayOfWeek.value + 7) % 7
+        return daysUntilNext > 0
     }
 }

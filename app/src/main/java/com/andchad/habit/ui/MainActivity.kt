@@ -4,7 +4,6 @@ import android.content.Context
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -118,13 +117,24 @@ fun HabitApp(
     // Counter to limit ad frequency
     var adCounter by remember { mutableStateOf(0) }
 
+    // Log the number of habits for debugging
+    Log.d("HabitApp", "Total habits: ${habits.size}")
+
+    // Separate habits into upcoming and past due WITHOUT filtering them out
+    val upcomingHabits = habits.filter { !it.isCompleted && viewModel.isHabitUpcoming(it) }
+    val pastDueHabits = habits.filter { !it.isCompleted && !viewModel.isHabitUpcoming(it) }
+
+    // Log for debugging
+    Log.d("HabitApp", "Upcoming habits: ${upcomingHabits.size}, Past due: ${pastDueHabits.size}")
+
     NavHost(
         navController = navController,
         startDestination = "habits"
     ) {
         composable(route = "habits") {
             HabitListScreen(
-                habits = habits,
+                upcomingHabits = upcomingHabits,
+                pastDueHabits = pastDueHabits,
                 isDarkMode = isDarkMode,
                 showTodayHabitsOnly = showTodayHabitsOnly,
                 adCounter = adCounter,
@@ -154,9 +164,6 @@ fun HabitApp(
                 },
                 onDeleteHabit = { habit ->
                     viewModel.deleteHabit(habit)
-                },
-                onDeleteCompletedHabits = { completedHabits ->
-                    viewModel.deleteCompletedHabits(completedHabits)
                 },
                 onToggleCompleteHabit = { id, isCompleted ->
                     viewModel.completeHabit(id, isCompleted)
@@ -209,5 +216,4 @@ fun HabitApp(
             )
         }
     }
-
 }

@@ -1,6 +1,7 @@
 package com.andchad.habit.data
 
 import com.andchad.habit.data.model.Habit
+import com.andchad.habit.data.model.HabitHistory
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import java.time.DayOfWeek
@@ -10,7 +11,8 @@ import javax.inject.Singleton
 
 @Singleton
 class HabitRepository @Inject constructor(
-    private val habitDao: HabitDao
+    private val habitDao: HabitDao,
+    private val habitHistoryDao: HabitHistoryDao
 ) {
     // Get all habits from Room database
     fun getHabits(): Flow<List<Habit>> {
@@ -90,5 +92,27 @@ class HabitRepository @Inject constructor(
     suspend fun deleteHabit(habit: Habit) {
         // Delete from local database
         habitDao.deleteHabit(habit)
+    }
+
+    // HABIT HISTORY METHODS
+
+    // Save habit history
+    suspend fun saveHabitHistory(habitHistory: HabitHistory) {
+        habitHistoryDao.insertHabitHistory(habitHistory)
+    }
+
+    // Get habit history for a specific habit
+    fun getHabitHistoryForHabit(habitId: String): Flow<List<HabitHistory>> {
+        return habitHistoryDao.getHabitHistoryForHabit(habitId)
+    }
+
+    // Get habit history for a specific date
+    fun getHabitHistoryForDate(date: Long): Flow<List<HabitHistory>> {
+        return habitHistoryDao.getHabitHistoryForDate(date)
+    }
+
+    // Get habit history between two dates
+    fun getHabitHistoryBetweenDates(startDate: Long, endDate: Long): Flow<List<HabitHistory>> {
+        return habitHistoryDao.getHabitHistoryBetweenDates(startDate, endDate)
     }
 }
