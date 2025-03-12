@@ -110,14 +110,12 @@ class AdManager @Inject constructor(private val context: Context) {
     }
 
     private fun shouldShowAd(): Boolean {
-        //TODO chose to show ads or not
-        return false;
-//        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-//        val lastAdShown = prefs.getLong(LAST_AD_SHOWN_KEY, 0)
-//        val currentTime = System.currentTimeMillis()
-//
-//        // Check if AD_INTERVAL_HOURS have passed since the last ad
-//        return currentTime - lastAdShown >= TimeUnit.HOURS.toMillis(AD_INTERVAL_HOURS)
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val lastAdShown = prefs.getLong(LAST_AD_SHOWN_KEY, 0)
+        val currentTime = System.currentTimeMillis()
+
+        // Check if AD_INTERVAL_HOURS have passed since the last ad
+        return currentTime - lastAdShown >= TimeUnit.HOURS.toMillis(AD_INTERVAL_HOURS)
     }
 
     private fun updateLastAdShownTime() {
