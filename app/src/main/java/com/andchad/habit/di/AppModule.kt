@@ -4,7 +4,6 @@ import android.content.Context
 import androidx.room.Room
 import com.andchad.habit.data.HabitDao
 import com.andchad.habit.data.HabitDatabase
-import com.andchad.habit.data.HabitHistoryDao
 import com.andchad.habit.data.HabitRepository
 import com.andchad.habit.data.MIGRATION_1_2
 import com.andchad.habit.data.MIGRATION_2_3
@@ -33,7 +32,6 @@ object AppModule {
             "habits_database"
         )
             .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
-            // Adding this fallback strategy for handling schema issues
             .fallbackToDestructiveMigration()
             .build()
     }
@@ -44,17 +42,12 @@ object AppModule {
     }
 
     @Provides
-    fun provideHabitHistoryDao(database: HabitDatabase): HabitHistoryDao {
-        return database.habitHistoryDao()
-    }
-
-    @Provides
     @Singleton
     fun provideHabitRepository(
         habitDao: HabitDao,
-        habitHistoryDao: HabitHistoryDao
+        database: HabitDatabase
     ): HabitRepository {
-        return HabitRepository(habitDao, habitHistoryDao)
+        return HabitRepository(habitDao, database)
     }
 
     @Provides

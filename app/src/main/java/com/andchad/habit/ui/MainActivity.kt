@@ -9,29 +9,63 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.History
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.navigation.NavDestination.Companion.hierarchy
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.andchad.habit.data.model.Habit
 import com.andchad.habit.ui.screens.AddEditHabitScreen
 import com.andchad.habit.ui.screens.HabitListScreen
+import com.andchad.habit.ui.screens.HistoryScreen
 import com.andchad.habit.ui.theme.HabitTheme
 import com.andchad.habit.utils.AdManager
 import dagger.hilt.android.AndroidEntryPoint
 import java.time.DayOfWeek
 import javax.inject.Inject
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+
+// Define navigation destinations
+sealed class Screen(val route: String, val title: String, val selectedIcon: (@Composable () -> Unit), val unselectedIcon: (@Composable () -> Unit)) {
+    object Habits : Screen(
+        "habits",
+        "Habits",
+        { Icon(Icons.Filled.Home, contentDescription = "Habits") },
+        { Icon(Icons.Outlined.Home, contentDescription = "Habits") }
+    )
+    object History : Screen(
+        "history",
+        "History",
+        { Icon(Icons.Filled.History, contentDescription = "History") },
+        { Icon(Icons.Outlined.History, contentDescription = "History") }
+    )
+    object AddHabit : Screen("add_habit", "Add Habit", { }, { })
+    object EditHabit : Screen("edit_habit/{habitId}", "Edit Habit", { }, { })
+}
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -113,107 +147,153 @@ fun HabitApp(
     val habits by viewModel.habits.collectAsState()
     val isDarkMode by viewModel.isDarkMode.collectAsState()
     val showTodayHabitsOnly by viewModel.showTodayHabitsOnly.collectAsState()
+    val habitHistory by viewModel.habitHistory.collectAsState()
+    val habitNameMap by viewModel.habitNameMap.collectAsState()
 
     // Counter to limit ad frequency
     var adCounter by remember { mutableStateOf(0) }
 
-    // Log the number of habits for debugging
-    Log.d("HabitApp", "Total habits: ${habits.size}")
+    // Bottom nav items
+    val items = listOf(
+        Screen.Habits,
+        Screen.History
+    )
 
-    // Separate habits into upcoming and past due WITHOUT filtering them out
+    // Get current route for bottom nav selection
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentDestination = navBackStackEntry?.destination
+
+    // Separate habits into upcoming and past due
     val upcomingHabits = habits.filter { !it.isCompleted && viewModel.isHabitUpcoming(it) }
     val pastDueHabits = habits.filter { !it.isCompleted && !viewModel.isHabitUpcoming(it) }
 
-    // Log for debugging
-    Log.d("HabitApp", "Upcoming habits: ${upcomingHabits.size}, Past due: ${pastDueHabits.size}")
+    Scaffold(
+        bottomBar = {
+            // Only show bottom nav on main screens
+            val currentRoute = currentDestination?.route
+            val showBottomNav = currentRoute == Screen.Habits.route || currentRoute == Screen.History.route
 
-    NavHost(
-        navController = navController,
-        startDestination = "habits"
-    ) {
-        composable(route = "habits") {
-            HabitListScreen(
-                upcomingHabits = upcomingHabits,
-                pastDueHabits = pastDueHabits,
-                isDarkMode = isDarkMode,
-                showTodayHabitsOnly = showTodayHabitsOnly,
-                adCounter = adCounter,
-                onToggleDarkMode = { viewModel.toggleDarkMode() },
-                onToggleHabitsFilter = { viewModel.toggleHabitsFilter() },
-                onAddHabit = {
-                    // Show ad occasionally when navigating to create a habit
-                    adCounter++
-                    Log.d("AdTest", "Action performed. Ad counter: $adCounter/3")
+            if (showBottomNav) {
+                NavigationBar {
+                    items.forEach { screen ->
+                        val selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true
 
-                    if (adCounter >= 3) { // Show ad every 3 actions
-                        Log.d("AdTest", "Triggering ad display")
-                        onShowAd()
-                        adCounter = 0
+                        NavigationBarItem(
+                            icon = {
+                                if (selected) screen.selectedIcon() else screen.unselectedIcon()
+                            },
+                            label = { Text(screen.title) },
+                            selected = selected,
+                            onClick = {
+                                navController.navigate(screen.route) {
+                                    // Pop up to the start destination of the graph to
+                                    // avoid building up a large stack of destinations
+                                    popUpTo(navController.graph.findStartDestination().id) {
+                                        saveState = true
+                                    }
+                                    // Avoid multiple copies of the same destination
+                                    launchSingleTop = true
+                                    // Restore state when reselecting a previously selected item
+                                    restoreState = true
+                                }
+                            }
+                        )
                     }
-
-                    navController.navigate("add_habit") {
-                        launchSingleTop = true
-                        restoreState = true
-                    }
-                },
-                onEditHabit = { habit ->
-                    navController.navigate("edit_habit/${habit.id}") {
-                        launchSingleTop = true
-                        restoreState = true
-                    }
-                },
-                onDeleteHabit = { habit ->
-                    viewModel.deleteHabit(habit)
-                },
-                onToggleCompleteHabit = { id, isCompleted ->
-                    viewModel.completeHabit(id, isCompleted)
                 }
-            )
+            }
         }
+    ) { paddingValues ->
+        NavHost(
+            navController = navController,
+            startDestination = Screen.Habits.route,
+            modifier = Modifier.padding(paddingValues)
+        ) {
+            composable(Screen.Habits.route) {
+                HabitListScreen(
+                    upcomingHabits = upcomingHabits,
+                    pastDueHabits = pastDueHabits,
+                    isDarkMode = isDarkMode,
+                    showTodayHabitsOnly = showTodayHabitsOnly,
+                    adCounter = adCounter,
+                    onToggleDarkMode = { viewModel.toggleDarkMode() },
+                    onToggleHabitsFilter = { viewModel.toggleHabitsFilter() },
+                    onAddHabit = {
+                        // Show ad occasionally when navigating to create a habit
+                        adCounter++
+                        Log.d("AdTest", "Action performed. Ad counter: $adCounter/3")
 
-        composable(route = "add_habit") {
-            AddEditHabitScreen(
-                habit = null,
-                viewModel = viewModel,
-                onSave = { name, reminderTime, scheduledDays, vibrationEnabled, snoozeEnabled ->
-                    viewModel.createHabit(
-                        name,
-                        reminderTime,
-                        scheduledDays,
-                        vibrationEnabled,
-                        snoozeEnabled
-                    )
-                    navController.popBackStack()
-                },
-                onBack = { navController.popBackStack() }
-            )
-        }
+                        if (adCounter >= 3) { // Show ad every 3 actions
+                            Log.d("AdTest", "Triggering ad display")
+                            onShowAd()
+                            adCounter = 0
+                        }
 
-        composable(
-            route = "edit_habit/{habitId}",
-            arguments = listOf(
-                navArgument("habitId") { type = NavType.StringType }
-            )
-        ) { backStackEntry ->
-            val habitId = backStackEntry.arguments?.getString("habitId") ?: return@composable
-            val habit = habits.find { it.id == habitId } ?: return@composable
+                        navController.navigate(Screen.AddHabit.route)
+                    },
+                    onEditHabit = { habit ->
+                        navController.navigate("edit_habit/${habit.id}")
+                    },
+                    onDeleteHabit = { habit ->
+                        viewModel.deleteHabit(habit)
+                    },
+                    onToggleCompleteHabit = { id, isCompleted ->
+                        viewModel.completeHabit(id, isCompleted)
+                    }
+                )
+            }
 
-            AddEditHabitScreen(
-                habit = habit,
-                viewModel = viewModel,
-                onSave = { name, reminderTime, scheduledDays, vibrationEnabled, snoozeEnabled ->
-                    viewModel.updateHabit(
-                        habit.id,
-                        name,
-                        reminderTime,
-                        scheduledDays,
-                        vibrationEnabled,
-                        snoozeEnabled
-                    )
-                    navController.popBackStack()
-                },
-                onBack = { navController.popBackStack() }
-            )
+            composable(Screen.History.route) {
+                HistoryScreen(
+                    habitHistory = habitHistory,
+                    habitNameMap = habitNameMap,
+                    viewModel = viewModel
+                )
+            }
+
+            composable(Screen.AddHabit.route) {
+                AddEditHabitScreen(
+                    habit = null,
+                    viewModel = viewModel,
+                    onSave = { name, reminderTime, scheduledDays, vibrationEnabled, snoozeEnabled ->
+                        viewModel.createHabit(
+                            name,
+                            reminderTime,
+                            scheduledDays,
+                            vibrationEnabled,
+                            snoozeEnabled
+                        )
+                        navController.popBackStack()
+                    },
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(
+                Screen.EditHabit.route,
+                arguments = listOf(
+                    navArgument("habitId") { type = NavType.StringType }
+                )
+            ) { backStackEntry ->
+                val habitId = backStackEntry.arguments?.getString("habitId") ?: return@composable
+                val habit = habits.find { it.id == habitId } ?: return@composable
+
+                AddEditHabitScreen(
+                    habit = habit,
+                    viewModel = viewModel,
+                    onSave = { name, reminderTime, scheduledDays, vibrationEnabled, snoozeEnabled ->
+                        viewModel.updateHabit(
+                            habit.id,
+                            name,
+                            reminderTime,
+                            scheduledDays,
+                            vibrationEnabled,
+                            snoozeEnabled
+                        )
+                        navController.popBackStack()
+                    },
+                    onBack = { navController.popBackStack() }
+                )
+            }
         }
     }
 }

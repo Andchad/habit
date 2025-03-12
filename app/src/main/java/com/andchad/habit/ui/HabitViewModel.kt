@@ -5,6 +5,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.andchad.habit.data.HabitRepository
 import com.andchad.habit.data.model.Habit
+import com.andchad.habit.data.model.HabitHistory
+import com.andchad.habit.data.model.HabitStatus
 import com.andchad.habit.utils.AlarmUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -17,9 +19,10 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import java.time.DayOfWeek
-import javax.inject.Inject
-import kotlinx.coroutines.flow.combine
 import java.time.LocalDate
+import java.time.LocalTime
+import java.time.ZoneId
+import javax.inject.Inject
 
 @HiltViewModel
 class HabitViewModel @Inject constructor(
@@ -44,6 +47,14 @@ class HabitViewModel @Inject constructor(
     // Store all unfiltered habits
     private val _allHabits = MutableStateFlow<List<Habit>>(emptyList())
 
+    // Add state for habit history
+    private val _habitHistory = MutableStateFlow<List<HabitHistory>>(emptyList())
+    val habitHistory: StateFlow<List<HabitHistory>> = _habitHistory.asStateFlow()
+
+    // Map of habit IDs to their names for displaying in history
+    private val _habitNameMap = MutableStateFlow<Map<String, String>>(emptyMap())
+    val habitNameMap: StateFlow<Map<String, String>> = _habitNameMap.asStateFlow()
+
     init {
         // Observe habits from repository
         viewModelScope.launch {
@@ -53,6 +64,10 @@ class HabitViewModel @Inject constructor(
 
                 // Apply order and filtering
                 applyHabitsFilter()
+
+                // Update the habit name map
+                val newMap = habitsList.associate { it.id to it.name }
+                _habitNameMap.value = newMap
             }
         }
 
@@ -62,6 +77,17 @@ class HabitViewModel @Inject constructor(
                 applyHabitsFilter()
             }
         }
+
+        // Fetch history data
+        viewModelScope.launch {
+            try {
+                habitRepository.getHabitHistory().collect { historyFromRepo ->
+                    _habitHistory.value = historyFromRepo
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("HabitViewModel", "Error fetching habit history: ${e.message}")
+            }
+        }
     }
 
     // Function to toggle between today's habits and all habits
@@ -69,7 +95,79 @@ class HabitViewModel @Inject constructor(
         _showTodayHabitsOnly.value = !_showTodayHabitsOnly.value
     }
 
+    // Apply filtering and sorting to habits
+    private fun applyHabitsFilter() {
+        val habitsList = _allHabits.value
 
+        // Update order with any new habits
+        if (_habitOrder.value.isEmpty()) {
+            // Initialize habit order if empty
+            _habitOrder.value = habitsList.map { it.id }
+        } else {
+            // Update order with any new habits
+            val currentOrder = _habitOrder.value.toMutableList()
+            habitsList.forEach { habit ->
+                if (!currentOrder.contains(habit.id)) {
+                    currentOrder.add(habit.id)
+                }
+            }
+            // Remove IDs of deleted habits
+            val existingIds = habitsList.map { it.id }
+            _habitOrder.value = currentOrder.filter { existingIds.contains(it) }
+        }
+
+        // Filter for today if needed
+        val filteredList = if (_showTodayHabitsOnly.value) {
+            val today = LocalDate.now().dayOfWeek
+            habitsList.filter { habit ->
+                habit.scheduledDays.contains(today)
+            }
+        } else {
+            habitsList
+        }
+
+        // Sort habits according to user order
+        val sortedHabits = filteredList.sortedBy { habit ->
+            _habitOrder.value.indexOf(habit.id).let {
+                if (it >= 0) it else Int.MAX_VALUE
+            }
+        }
+
+        _habits.value = sortedHabits
+    }
+
+    // Check if a habit is upcoming (for UI display)
+    fun isHabitUpcoming(habit: Habit): Boolean {
+        try {
+            // Get the current date and day of week
+            val today = LocalDate.now()
+            val currentDayOfWeek = today.dayOfWeek
+            val now = LocalTime.now()
+
+            // Check if the habit is scheduled for a future day
+            if (habit.scheduledDays.any { it != currentDayOfWeek && isDateAfterToday(today, it) }) {
+                return true
+            }
+
+            // If scheduled for today, check if the time is in the future
+            if (habit.scheduledDays.contains(currentDayOfWeek)) {
+                val habitTime = habit.getReminderTimeAsLocalTime()
+                return habitTime.isAfter(now)
+            }
+
+            // If not scheduled for today or any future day, it's not upcoming
+            return false
+        } catch (e: Exception) {
+            android.util.Log.e("HabitViewModel", "Error checking if habit is upcoming: ${e.message}")
+            return false
+        }
+    }
+
+    // Helper method to determine if a day is after today
+    private fun isDateAfterToday(today: LocalDate, dayOfWeek: DayOfWeek): Boolean {
+        val daysUntilNext = (dayOfWeek.value - today.dayOfWeek.value + 7) % 7
+        return daysUntilNext > 0
+    }
 
     // Check if a habit with this name already exists
     suspend fun habitNameExists(name: String): Boolean {
@@ -122,15 +220,13 @@ class HabitViewModel @Inject constructor(
                 alarmUtils.cancelAlarm(habit.id)
 
                 // Schedule with the new details
-                scheduleHabitAlarm(
-                    habit.copy(
-                        name = name,
-                        reminderTime = reminderTime,
-                        scheduledDays = scheduledDays,
-                        vibrationEnabled = vibrationEnabled,
-                        snoozeEnabled = snoozeEnabled
-                    )
-                )
+                scheduleHabitAlarm(habit.copy(
+                    name = name,
+                    reminderTime = reminderTime,
+                    scheduledDays = scheduledDays,
+                    vibrationEnabled = vibrationEnabled,
+                    snoozeEnabled = snoozeEnabled
+                ))
             }
         }
     }
@@ -161,9 +257,24 @@ class HabitViewModel @Inject constructor(
         viewModelScope.launch {
             habitRepository.completeHabit(id, isCompleted)
 
-            // If marked as completed, cancel the alarm
+            // If marked as completed, cancel the alarm and record history
             if (isCompleted) {
                 alarmUtils.cancelAlarm(id)
+
+                // Record completion in history
+                val habit = _allHabits.value.find { it.id == id }
+                if (habit != null) {
+                    val today = LocalDate.now()
+                    val timestamp = today.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+
+                    val historyEntry = HabitHistory(
+                        habitId = habit.id,
+                        date = timestamp,
+                        status = HabitStatus.COMPLETED
+                    )
+
+                    habitRepository.saveHabitHistory(historyEntry)
+                }
             } else {
                 // Re-schedule alarm if marked as not completed
                 val habit = _allHabits.value.find { it.id == id }
@@ -213,83 +324,37 @@ class HabitViewModel @Inject constructor(
         }
     }
 
-    private fun applyHabitsFilter() {
-        val habitsList = _allHabits.value
+    // Load history for a specific date
+    fun loadHistoryForDate(date: LocalDate) {
+        viewModelScope.launch {
+            try {
+                val startOfDay = date.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                val endOfDay = date.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli() - 1
 
-        // Apply the order without filtering yet
-        if (_habitOrder.value.isEmpty()) {
-            // Initialize habit order if empty
-            _habitOrder.value = habitsList.map { it.id }
-        } else {
-            // Update order with any new habits
-            val currentOrder = _habitOrder.value.toMutableList()
-            habitsList.forEach { habit ->
-                if (!currentOrder.contains(habit.id)) {
-                    currentOrder.add(habit.id)
-                }
+                habitRepository.getHabitHistoryForDateRange(startOfDay, endOfDay)
+                    .collect { historyForDate ->
+                        _habitHistory.value = historyForDate
+                    }
+            } catch (e: Exception) {
+                android.util.Log.e("HabitViewModel", "Error loading history for date: ${e.message}")
             }
-            // Remove IDs of deleted habits
-            val existingIds = habitsList.map { it.id }
-            _habitOrder.value = currentOrder.filter { existingIds.contains(it) }
-        }
-
-        // Filter for today if needed but DON'T filter by upcoming status
-        val filteredList = if (_showTodayHabitsOnly.value) {
-            val today = LocalDate.now().dayOfWeek
-            habitsList.filter { habit ->
-                habit.scheduledDays.contains(today)
-            }
-        } else {
-            habitsList
-        }
-
-        // Sort habits according to user order
-        val sortedHabits = filteredList.sortedBy { habit ->
-            _habitOrder.value.indexOf(habit.id).let {
-                if (it >= 0) it else Int.MAX_VALUE
-            }
-        }
-
-        _habits.value = sortedHabits
-
-        // Log for debugging
-        android.util.Log.d("HabitViewModel", "Filtered habits: total=${_habits.value.size}, original=${habitsList.size}")
-    }
-
-    // This now returns "true" only for future habits
-    fun isHabitUpcoming(habit: Habit): Boolean {
-        try {
-            // Get the current date and day of week
-            val today = java.time.LocalDate.now()
-            val currentDayOfWeek = today.dayOfWeek
-            val now = java.time.LocalTime.now()
-
-            // Check if the habit is scheduled for a future day
-            if (habit.scheduledDays.any { it != currentDayOfWeek && isDateAfterToday(today, it) }) {
-                return true
-            }
-
-            // If scheduled for today, check if the time is in the future
-            if (habit.scheduledDays.contains(currentDayOfWeek)) {
-                val habitTime = habit.getReminderTimeAsLocalTime()
-                return habitTime.isAfter(now)
-            }
-
-            // If not scheduled for today or any future day, it's not upcoming
-            return false
-        } catch (e: Exception) {
-            android.util.Log.e("HabitViewModel", "Error checking if habit is upcoming: ${e.message}")
-            return false
         }
     }
 
-    // Add this method to check if a habit is past due
-    fun isHabitPastDue(habit: Habit): Boolean {
-        return !isHabitUpcoming(habit) && !habit.isCompleted
-    }
+    // Load history for a date range
+    fun loadHistoryForDateRange(startDate: LocalDate, endDate: LocalDate) {
+        viewModelScope.launch {
+            try {
+                val startMillis = startDate.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                val endMillis = endDate.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli() - 1
 
-    private fun isDateAfterToday(today: java.time.LocalDate, dayOfWeek: java.time.DayOfWeek): Boolean {
-        val daysUntilNext = (dayOfWeek.value - today.dayOfWeek.value + 7) % 7
-        return daysUntilNext > 0
+                habitRepository.getHabitHistoryForDateRange(startMillis, endMillis)
+                    .collect { historyForRange ->
+                        _habitHistory.value = historyForRange
+                    }
+            } catch (e: Exception) {
+                android.util.Log.e("HabitViewModel", "Error loading history for date range: ${e.message}")
+            }
+        }
     }
 }

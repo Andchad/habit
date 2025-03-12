@@ -4,6 +4,7 @@ import com.andchad.habit.data.model.Habit
 import com.andchad.habit.data.model.HabitHistory
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import java.time.DayOfWeek
 import java.util.UUID
 import javax.inject.Inject
@@ -12,8 +13,14 @@ import javax.inject.Singleton
 @Singleton
 class HabitRepository @Inject constructor(
     private val habitDao: HabitDao,
-    private val habitHistoryDao: HabitHistoryDao
+    private val database: HabitDatabase  // Inject the database directly
 ) {
+    // Use the database to get the DAOs
+    private val habitHistoryDao: HabitHistoryDao
+        get() = database.habitHistoryDao()
+
+    // Original methods remain the same
+
     // Get all habits from Room database
     fun getHabits(): Flow<List<Habit>> {
         return habitDao.getHabits()
@@ -96,23 +103,63 @@ class HabitRepository @Inject constructor(
 
     // HABIT HISTORY METHODS
 
-    // Save habit history
-    suspend fun saveHabitHistory(habitHistory: HabitHistory) {
-        habitHistoryDao.insertHabitHistory(habitHistory)
+    // Get all habit history
+    fun getHabitHistory(): Flow<List<HabitHistory>> {
+        return try {
+            habitHistoryDao.getAllHabitHistory()
+        } catch (e: Exception) {
+            android.util.Log.e("HabitRepository", "Error getting habit history: ${e.message}")
+            flowOf(emptyList()) // Return empty flow on error
+        }
     }
 
-    // Get habit history for a specific habit
+    // Get history for a specific habit
     fun getHabitHistoryForHabit(habitId: String): Flow<List<HabitHistory>> {
-        return habitHistoryDao.getHabitHistoryForHabit(habitId)
+        return try {
+            habitHistoryDao.getHabitHistoryForHabit(habitId)
+        } catch (e: Exception) {
+            android.util.Log.e("HabitRepository", "Error getting habit history for habit: ${e.message}")
+            flowOf(emptyList())
+        }
     }
 
-    // Get habit history for a specific date
+    // Get history for a specific date
     fun getHabitHistoryForDate(date: Long): Flow<List<HabitHistory>> {
-        return habitHistoryDao.getHabitHistoryForDate(date)
+        return try {
+            habitHistoryDao.getHabitHistoryForDate(date)
+        } catch (e: Exception) {
+            android.util.Log.e("HabitRepository", "Error getting habit history for date: ${e.message}")
+            flowOf(emptyList())
+        }
     }
 
-    // Get habit history between two dates
-    fun getHabitHistoryBetweenDates(startDate: Long, endDate: Long): Flow<List<HabitHistory>> {
-        return habitHistoryDao.getHabitHistoryBetweenDates(startDate, endDate)
+    // Get history for a date range
+    fun getHabitHistoryForDateRange(startDate: Long, endDate: Long): Flow<List<HabitHistory>> {
+        return try {
+            habitHistoryDao.getHabitHistoryBetweenDates(startDate, endDate)
+        } catch (e: Exception) {
+            android.util.Log.e("HabitRepository", "Error getting habit history for date range: ${e.message}")
+            flowOf(emptyList())
+        }
+    }
+
+    // Save a single habit history entry
+    suspend fun saveHabitHistory(habitHistory: HabitHistory) {
+        try {
+            habitHistoryDao.insertHabitHistory(habitHistory)
+        } catch (e: Exception) {
+            android.util.Log.e("HabitRepository", "Error saving habit history: ${e.message}")
+        }
+    }
+
+    // Record a batch of habit histories
+    suspend fun recordHabitHistories(habitHistories: List<HabitHistory>) {
+        try {
+            habitHistories.forEach { habitHistory ->
+                habitHistoryDao.insertHabitHistory(habitHistory)
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("HabitRepository", "Error recording habit histories: ${e.message}")
+        }
     }
 }
