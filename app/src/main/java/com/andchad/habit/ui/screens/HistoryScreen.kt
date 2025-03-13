@@ -14,7 +14,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -83,49 +82,48 @@ fun HistoryScreen(
             .toLocalDate()
     }.entries.sortedByDescending { it.key }
 
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = { Text("Clear History") },
+            text = { Text("Are you sure you want to delete all habit history? This action cannot be undone.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.clearAllHabitHistory()
+                        showDeleteDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Delete All")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showDeleteDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
     Scaffold(
         topBar = {
             ModernTopAppBar(
                 title = "Habit History"
-                // Removed the delete button from here
+                // No delete button in top bar
             )
         },
         floatingActionButton = {
+            // Filter FAB on the right
             FloatingActionButton(
                 onClick = { showFilterSheet = true },
-                containerColor = MaterialTheme.colorScheme.primary
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
             ) {
                 Icon(
                     imageVector = Icons.Default.FilterList,
                     contentDescription = "Filter History"
                 )
-            }
-        },
-        bottomBar = {
-            // Only show delete button if there's history to delete
-            if (habitHistory.isNotEmpty()) {
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shadowElevation = 8.dp
-                ) {
-                    Button(
-                        onClick = { showDeleteDialog = true },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.errorContainer,
-                            contentColor = MaterialTheme.colorScheme.error
-                        )
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = "Delete All",
-                            modifier = Modifier.padding(end = 8.dp)
-                        )
-                        Text("Clear All History")
-                    }
-                }
             }
         }
     ) { padding ->
@@ -242,6 +240,23 @@ fun HistoryScreen(
                     }
                 }
             }
+
+            // Delete FAB (positioned on the left side)
+            if (habitHistory.isNotEmpty()) {
+                FloatingActionButton(
+                    onClick = { showDeleteDialog = true },
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.error,
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(16.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "Clear All History"
+                    )
+                }
+            }
         }
     }
 
@@ -301,30 +316,6 @@ fun HistoryScreen(
                 Spacer(modifier = Modifier.height(24.dp))
             }
         }
-    }
-
-    if (showDeleteDialog) {
-        AlertDialog(
-            onDismissRequest = { showDeleteDialog = false },
-            title = { Text("Clear History") },
-            text = { Text("Are you sure you want to delete all habit history? This action cannot be undone.") },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        viewModel.clearAllHabitHistory()
-                        showDeleteDialog = false
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                ) {
-                    Text("Delete All")
-                }
-            },
-            dismissButton = {
-                OutlinedButton(onClick = { showDeleteDialog = false }) {
-                    Text("Cancel")
-                }
-            }
-        )
     }
 }
 

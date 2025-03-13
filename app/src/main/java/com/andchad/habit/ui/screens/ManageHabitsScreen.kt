@@ -15,15 +15,11 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -36,7 +32,6 @@ import androidx.compose.ui.unit.dp
 import com.andchad.habit.data.model.Habit
 import com.andchad.habit.ui.components.ModernTopAppBar
 import com.andchad.habit.ui.screens.components.HabitItemCard
-import androidx.compose.ui.graphics.Color
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -82,25 +77,12 @@ fun ManageHabitsScreen(
     Scaffold(
         topBar = {
             ModernTopAppBar(
-                title = "Manage Habits",
-                actions = {
-                    IconButton(
-                        onClick = { showDeleteAllConfirmation = true },
-                        enabled = habits.isNotEmpty()
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = "Delete All",
-                            tint = if (habits.isNotEmpty())
-                                Color.White
-                            else
-                                Color.White.copy(alpha = 0.38f)
-                        )
-                    }
-                }
+                title = "Manage Habits"
+                // No actions for top bar - delete icon removed
             )
         },
         floatingActionButton = {
+            // Add FAB on the right
             FloatingActionButton(
                 onClick = onAddHabit,
                 containerColor = MaterialTheme.colorScheme.primary,
@@ -114,7 +96,7 @@ fun ManageHabitsScreen(
         }
     ) { paddingValues ->
         Box(
-            modifier = modifier
+            modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
@@ -132,25 +114,6 @@ fun ManageHabitsScreen(
                 Column(
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    // Delete all button at the top
-                    FilledTonalButton(
-                        onClick = { showDeleteAllConfirmation = true },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                        colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = MaterialTheme.colorScheme.errorContainer,
-                            contentColor = MaterialTheme.colorScheme.error
-                        )
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = "Delete All Habits",
-                            modifier = Modifier.padding(end = 8.dp)
-                        )
-                        Text("Delete All Habits")
-                    }
-
                     Text(
                         text = "All Habits (${habits.size})",
                         style = MaterialTheme.typography.titleMedium,
@@ -158,7 +121,7 @@ fun ManageHabitsScreen(
                     )
 
                     LazyColumn(
-                        contentPadding = PaddingValues(bottom = 88.dp), // Added extra padding at bottom for FAB
+                        contentPadding = PaddingValues(bottom = 88.dp), // Extra padding for FAB
                         modifier = Modifier.fillMaxSize()
                     ) {
                         items(
@@ -172,6 +135,23 @@ fun ManageHabitsScreen(
                                 modifier = Modifier.fillMaxWidth()
                             )
                         }
+                    }
+                }
+
+                // Delete FAB (positioned on the left side)
+                if (habits.isNotEmpty()) {
+                    FloatingActionButton(
+                        onClick = { showDeleteAllConfirmation = true },
+                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                        contentColor = MaterialTheme.colorScheme.error,
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(16.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Delete All Habits"
+                        )
                     }
                 }
             }
