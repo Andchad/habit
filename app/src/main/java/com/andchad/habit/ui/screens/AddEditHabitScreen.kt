@@ -1,5 +1,6 @@
 package com.andchad.habit.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -31,6 +32,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.unit.dp
 import com.andchad.habit.data.model.Habit
 import com.andchad.habit.ui.HabitViewModel
@@ -144,20 +146,34 @@ fun AddEditHabitScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            // Make the entire time field clickable
             OutlinedTextField(
                 value = selectedTime,
                 onValueChange = { },
                 label = { Text("Alarm Time") },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showTimePicker = true },
                 readOnly = true,
                 trailingIcon = {
-                    IconButton(onClick = { showTimePicker = true }) {
-                        Icon(
-                            imageVector = Icons.Default.Timer,
-                            contentDescription = "Set Time"
-                        )
-                    }
-                }
+                    Icon(
+                        imageVector = Icons.Default.Timer,
+                        contentDescription = "Set Time",
+                        // Make the icon appear non-clickable by reducing alpha
+                        // since the entire field is now clickable
+                        modifier = Modifier.alpha(0.7f)
+                    )
+                },
+                // Ensure text field isn't highlighted when clicked
+                enabled = false,
+                // Keep text color visible even though field is disabled
+                colors = androidx.compose.material3.TextFieldDefaults.outlinedTextFieldColors(
+                    disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                    disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    disabledBorderColor = MaterialTheme.colorScheme.outline,
+                    disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             )
 
             Spacer(modifier = Modifier.height(24.dp))
