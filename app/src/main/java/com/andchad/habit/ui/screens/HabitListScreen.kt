@@ -24,6 +24,8 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.andchad.habit.data.model.Habit
 import com.andchad.habit.ui.components.ModernTopAppBar
@@ -80,17 +82,33 @@ fun HabitListScreen(
         Box(
             modifier = modifier
                 .fillMaxSize()
-                .padding(paddingValues)
+                .padding(paddingValues),
+            contentAlignment = Alignment.Center
         ) {
             if (upcomingHabits.isEmpty() && pastDueHabits.isEmpty()) {
-                Text(
-                    text = if (showTodayHabitsOnly)
-                        "No upcoming habits scheduled for today. Tap + to create a habit!"
-                    else
-                        "No upcoming habits scheduled. Tap + to create a habit!",
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.align(Alignment.Center)
-                )
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.padding(horizontal = 32.dp)
+                ) {
+                    Text(
+                        text = if (showTodayHabitsOnly)
+                            "No upcoming habits scheduled for today."
+                        else
+                            "No upcoming habits scheduled.",
+                        style = MaterialTheme.typography.bodyLarge,
+                        textAlign = TextAlign.Center,
+                        fontWeight = FontWeight.Medium
+                    )
+
+                    Text(
+                        text = "Tap + to create a habit!",
+                        style = MaterialTheme.typography.bodyLarge,
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
             } else {
                 Column(
                     modifier = Modifier.fillMaxSize()
