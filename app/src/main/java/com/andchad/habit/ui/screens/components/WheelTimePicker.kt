@@ -25,17 +25,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 @Composable
@@ -52,39 +49,58 @@ fun WheelTimePicker(
     val hourItems = remember { List(24) { it } }
     val minuteItems = remember { List(60) { it } }
 
-    // Create padding for top and bottom
-    val visibleItems = 5
-    val extraItems = remember { List(visibleItems / 2) { -1 } }
-
     // Create list states
-    val hourState = rememberLazyListState()
-    val minuteState = rememberLazyListState()
+    val hourState = rememberLazyListState(initialFirstVisibleItemIndex = initialHour)
+    val minuteState = rememberLazyListState(initialFirstVisibleItemIndex = initialMinute)
     val scope = rememberCoroutineScope()
 
-    // Initialize scroll positions
-    LaunchedEffect(Unit) {
-        hourState.scrollToItem(initialHour, 0)
-        minuteState.scrollToItem(initialMinute, 0)
+    // Initialize scroll position to center the initial values
+    LaunchedEffect(key1 = Unit) {
+        kotlinx.coroutines.delay(50)
+        scope.launch {
+            hourState.scrollToItem(initialHour)
+        }
+        scope.launch {
+            minuteState.scrollToItem(initialMinute)
+        }
     }
 
-    // Track hour selection changes
-    LaunchedEffect(hourState) {
-        snapshotFlow { hourState.firstVisibleItemIndex }
-            .collectLatest { index ->
-                if (index >= 0 && index < hourItems.size) {
-                    selectedHour = hourItems[index]
-                }
-            }
+    // Update selected values when visible items change
+    LaunchedEffect(hourState.firstVisibleItemIndex) {
+        val centerIndex = hourState.firstVisibleItemIndex
+        if (centerIndex in hourItems.indices) {
+            selectedHour = hourItems[centerIndex]
+        }
     }
 
-    // Track minute selection changes
-    LaunchedEffect(minuteState) {
-        snapshotFlow { minuteState.firstVisibleItemIndex }
-            .collectLatest { index ->
-                if (index >= 0 && index < minuteItems.size) {
-                    selectedMinute = minuteItems[index]
+    LaunchedEffect(minuteState.firstVisibleItemIndex) {
+        val centerIndex = minuteState.firstVisibleItemIndex
+        if (centerIndex in minuteItems.indices) {
+            selectedMinute = minuteItems[centerIndex]
+        }
+    }
+
+    // Snap to center when scrolling stops
+    LaunchedEffect(hourState.isScrollInProgress) {
+        if (!hourState.isScrollInProgress) {
+            val currentIndex = hourState.firstVisibleItemIndex
+            if (currentIndex in hourItems.indices) {
+                scope.launch {
+                    hourState.animateScrollToItem(currentIndex)
                 }
             }
+        }
+    }
+
+    LaunchedEffect(minuteState.isScrollInProgress) {
+        if (!minuteState.isScrollInProgress) {
+            val currentIndex = minuteState.firstVisibleItemIndex
+            if (currentIndex in minuteItems.indices) {
+                scope.launch {
+                    minuteState.animateScrollToItem(currentIndex)
+                }
+            }
+        }
     }
 
     Dialog(onDismissRequest = onCancel) {
@@ -129,12 +145,26 @@ fun WheelTimePicker(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     // Hours wheel
-                    PickerWheel(
-                        items = hourItems,
-                        listState = hourState,
-                        formatText = { String.format("%02d", it) },
-                        modifier = Modifier.width(70.dp)
-                    )
+                    Box(
+                        modifier = Modifier.width(70.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        // Selection highlight
+                        Box(
+                            modifier = Modifier
+                                .height(50.dp)
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f))
+                                .align(Alignment.Center)
+                        )
+
+                        PickerWheel(
+                            items = hourItems,
+                            listState = hourState,
+                            formatText = { String.format("%02d", it) }
+                        )
+                    }
 
                     Text(
                         text = ":",
@@ -144,12 +174,26 @@ fun WheelTimePicker(
                     )
 
                     // Minutes wheel
-                    PickerWheel(
-                        items = minuteItems,
-                        listState = minuteState,
-                        formatText = { String.format("%02d", it) },
-                        modifier = Modifier.width(70.dp)
-                    )
+                    Box(
+                        modifier = Modifier.width(70.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        // Selection highlight
+                        Box(
+                            modifier = Modifier
+                                .height(50.dp)
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f))
+                                .align(Alignment.Center)
+                        )
+
+                        PickerWheel(
+                            items = minuteItems,
+                            listState = minuteState,
+                            formatText = { String.format("%02d", it) }
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -159,18 +203,26 @@ fun WheelTimePicker(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = 8.dp),
-                    horizontalArrangement = Arrangement.End
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    TextButton(onClick = onCancel) {
-                        Text("Cancel")
+                    TextButton(
+                        onClick = onCancel,
+                        modifier = Modifier.padding(horizontal = 8.dp)
+                    ) {
+                        Text(
+                            text = "Cancel",
+                            color = MaterialTheme.colorScheme.primary
+                        )
                     }
 
-                    Spacer(modifier = Modifier.width(8.dp))
-
                     TextButton(
-                        onClick = { onConfirm(selectedHour, selectedMinute) }
+                        onClick = { onConfirm(selectedHour, selectedMinute) },
+                        modifier = Modifier.padding(horizontal = 8.dp)
                     ) {
-                        Text("OK")
+                        Text(
+                            text = "OK",
+                            color = MaterialTheme.colorScheme.primary
+                        )
                     }
                 }
             }
@@ -186,27 +238,18 @@ private fun PickerWheel(
     modifier: Modifier = Modifier
 ) {
     val itemHeight = 50.dp
-    val visibleItems = 3 // Number of visible items (should be odd)
+    val visibleItems = 5 // Number of visible items (should be odd)
 
     Box(
         modifier = modifier.height(itemHeight * visibleItems),
         contentAlignment = Alignment.Center
     ) {
-        // Background highlight for the selected item
-        Box(
-            modifier = Modifier
-                .height(itemHeight)
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f))
-                .align(Alignment.Center)
-        )
-
         // The wheel itself
         LazyColumn(
             state = listState,
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.fillMaxWidth(),
-            userScrollEnabled = true
+            userScrollEnabled = true,
+            modifier = Modifier.fillMaxWidth()
         ) {
             // Add padding items at top
             items(visibleItems / 2) {
@@ -218,6 +261,11 @@ private fun PickerWheel(
                 val item = items[index]
                 val isSelected = index == listState.firstVisibleItemIndex
 
+                // Calculate appearance based on distance from selection
+                val distanceFromCurrent = kotlin.math.abs(index - listState.firstVisibleItemIndex)
+                val alpha = 1f - (distanceFromCurrent * 0.2f).coerceIn(0f, 0.8f)
+                val fontSize = if (isSelected) 20.sp else 18.sp
+
                 Box(
                     modifier = Modifier
                         .height(itemHeight)
@@ -226,13 +274,14 @@ private fun PickerWheel(
                 ) {
                     Text(
                         text = formatText(item),
-                        fontSize = if (isSelected) 22.sp else 18.sp,
+                        fontSize = fontSize,
                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                         textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(4.dp),
                         color = if (isSelected)
                             MaterialTheme.colorScheme.primary
                         else
-                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = alpha)
                     )
                 }
             }
