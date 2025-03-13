@@ -371,6 +371,17 @@ fun HabitApp(
                             snackbarHostState.showSnackbar("All habits deleted")
                         }
                         navController.popBackStack()
+                    },
+                    onAddHabit = {
+                        // Show ad occasionally when navigating to create a habit
+                        adCounter++
+
+                        if (adCounter >= 3) { // Show ad every 3 actions
+                            onShowAd()
+                            adCounter = 0
+                        }
+
+                        navController.navigate(Screen.AddHabit.route)
                     }
                 )
             }

@@ -3,21 +3,20 @@ package com.andchad.habit.ui.screens
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -45,6 +44,7 @@ fun ManageHabitsScreen(
     onEditHabit: (Habit) -> Unit,
     onDeleteHabit: (Habit) -> Unit,
     onDeleteAllHabits: () -> Unit,
+    onAddHabit: () -> Unit, // New parameter for add habit functionality
     modifier: Modifier = Modifier
 ) {
     var showDeleteAllConfirmation by remember { mutableStateOf(false) }
@@ -101,6 +101,18 @@ fun ManageHabitsScreen(
                     }
                 }
             )
+        },
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = onAddHabit,
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "Add Habit"
+                )
+            }
         }
     ) { paddingValues ->
         Box(
@@ -148,7 +160,7 @@ fun ManageHabitsScreen(
                     )
 
                     LazyColumn(
-                        contentPadding = PaddingValues(bottom = 16.dp),
+                        contentPadding = PaddingValues(bottom = 88.dp), // Added extra padding at bottom for FAB
                         modifier = Modifier.fillMaxSize()
                     ) {
                         items(
