@@ -15,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -47,6 +48,7 @@ fun HabitListScreen(
     onEditHabit: (Habit) -> Unit,
     onDeleteHabit: (Habit) -> Unit,
     onToggleCompleteHabit: (String, Boolean) -> Unit,
+    onManageHabits: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Scaffold(
@@ -58,6 +60,14 @@ fun HabitListScreen(
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 ),
                 actions = {
+                    // Manage Habits Button
+                    IconButton(onClick = onManageHabits) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "Manage Habits"
+                        )
+                    }
+
                     // Today/All Toggle
                     Row(
                         verticalAlignment = Alignment.CenterVertically,

@@ -46,6 +46,7 @@ class HabitViewModel @Inject constructor(
 
     // Store all unfiltered habits
     private val _allHabits = MutableStateFlow<List<Habit>>(emptyList())
+    val allHabits: StateFlow<List<Habit>> = _allHabits.asStateFlow()
 
     // Add state for habit history
     private val _habitHistory = MutableStateFlow<List<HabitHistory>>(emptyList())

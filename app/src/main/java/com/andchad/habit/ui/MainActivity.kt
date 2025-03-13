@@ -3,7 +3,6 @@ package com.andchad.habit.ui
 import android.content.Context
 import android.os.Build
 import android.os.Bundle
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -20,6 +19,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -27,6 +28,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -42,12 +44,14 @@ import com.andchad.habit.data.model.Habit
 import com.andchad.habit.ui.screens.AddEditHabitScreen
 import com.andchad.habit.ui.screens.HabitListScreen
 import com.andchad.habit.ui.screens.HistoryScreen
+import com.andchad.habit.ui.screens.ManageHabitsScreen
 import com.andchad.habit.ui.theme.HabitTheme
 import com.andchad.habit.utils.AdManager
 import dagger.hilt.android.AndroidEntryPoint
 import java.time.DayOfWeek
 import javax.inject.Inject
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import kotlinx.coroutines.launch
 
 // Define navigation destinations
 sealed class Screen(val route: String, val title: String, val selectedIcon: (@Composable () -> Unit), val unselectedIcon: (@Composable () -> Unit)) {
@@ -65,6 +69,7 @@ sealed class Screen(val route: String, val title: String, val selectedIcon: (@Co
     )
     object AddHabit : Screen("add_habit", "Add Habit", { }, { })
     object EditHabit : Screen("edit_habit/{habitId}", "Edit Habit", { }, { })
+    object ManageHabits : Screen("manage_habits", "Manage Habits", { }, { }) // New route
 }
 
 @AndroidEntryPoint
@@ -145,10 +150,13 @@ fun HabitApp(
 ) {
     val navController = rememberNavController()
     val habits by viewModel.habits.collectAsState()
+    val allHabits by viewModel.allHabits.collectAsState() // Collect all habits for manage screen
     val isDarkMode by viewModel.isDarkMode.collectAsState()
     val showTodayHabitsOnly by viewModel.showTodayHabitsOnly.collectAsState()
     val habitHistory by viewModel.habitHistory.collectAsState()
     val habitNameMap by viewModel.habitNameMap.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
     // Counter to limit ad frequency
     var adCounter by remember { mutableStateOf(0) }
@@ -168,6 +176,7 @@ fun HabitApp(
     val pastDueHabits = habits.filter { !it.isCompleted && !viewModel.isHabitUpcoming(it) }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         bottomBar = {
             // Only show bottom nav on main screens
             val currentRoute = currentDestination?.route
@@ -222,7 +231,6 @@ fun HabitApp(
                         adCounter++
 
                         if (adCounter >= 3) { // Show ad every 3 actions
-
                             onShowAd()
                             adCounter = 0
                         }
@@ -237,6 +245,10 @@ fun HabitApp(
                     },
                     onToggleCompleteHabit = { id, isCompleted ->
                         viewModel.completeHabit(id, isCompleted)
+                    },
+                    onManageHabits = {
+                        // Navigate to the manage habits screen
+                        navController.navigate(Screen.ManageHabits.route)
                     }
                 )
             }
@@ -246,6 +258,33 @@ fun HabitApp(
                     habitHistory = habitHistory,
                     habitNameMap = habitNameMap,
                     viewModel = viewModel
+                )
+            }
+
+            // New Manage Habits screen
+            composable(Screen.ManageHabits.route) {
+                ManageHabitsScreen(
+                    habits = allHabits,
+                    onBack = { navController.popBackStack() },
+                    onEditHabit = { habit ->
+                        navController.navigate("edit_habit/${habit.id}")
+                    },
+                    onDeleteHabit = { habit ->
+                        viewModel.deleteHabit(habit)
+                        scope.launch {
+                            snackbarHostState.showSnackbar("Habit '${habit.name}' deleted")
+                        }
+                    },
+                    onDeleteAllHabits = {
+                        // Delete all habits
+                        allHabits.forEach { habit ->
+                            viewModel.deleteHabit(habit)
+                        }
+                        scope.launch {
+                            snackbarHostState.showSnackbar("All habits deleted")
+                        }
+                        navController.popBackStack()
+                    }
                 )
             }
 
@@ -274,7 +313,7 @@ fun HabitApp(
                 )
             ) { backStackEntry ->
                 val habitId = backStackEntry.arguments?.getString("habitId") ?: return@composable
-                val habit = habits.find { it.id == habitId } ?: return@composable
+                val habit = allHabits.find { it.id == habitId } ?: return@composable
 
                 AddEditHabitScreen(
                     habit = habit,
