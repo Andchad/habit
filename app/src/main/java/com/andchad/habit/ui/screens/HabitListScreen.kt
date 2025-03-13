@@ -3,26 +3,21 @@ package com.andchad.habit.ui.screens
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LightMode
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -48,8 +43,8 @@ fun HabitListScreen(
     onEditHabit: (Habit) -> Unit,
     onDeleteHabit: (Habit) -> Unit,
     onToggleCompleteHabit: (String, Boolean) -> Unit,
-    onDismissHabit: (String) -> Unit, // New callback for dismissing habits
-    onManageHabits: () -> Unit,
+    onDismissHabit: (String) -> Unit,
+    onManageHabits: () -> Unit, // Kept for compatibility but not used
     modifier: Modifier = Modifier
 ) {
     Scaffold(
@@ -61,32 +56,7 @@ fun HabitListScreen(
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 ),
                 actions = {
-                    // Manage Habits Button
-                    IconButton(onClick = onManageHabits) {
-                        Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = "Manage Habits"
-                        )
-                    }
-
-                    // Today/All Toggle
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(end = 8.dp)
-                    ) {
-                        Text(
-                            text = "Today only",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-
-                        Spacer(modifier = Modifier.width(8.dp))
-
-                        Switch(
-                            checked = showTodayHabitsOnly,
-                            onCheckedChange = { onToggleHabitsFilter() }
-                        )
-                    }
-
+                    // Only keep the Dark Mode toggle
                     IconButton(onClick = onToggleDarkMode) {
                         Icon(
                             imageVector = if (isDarkMode) Icons.Default.LightMode else Icons.Default.DarkMode,
@@ -132,7 +102,7 @@ fun HabitListScreen(
                         PastDueHabitList(
                             pastDueHabits = pastDueHabits,
                             onToggleComplete = onToggleCompleteHabit,
-                            onDismissHabit = onDismissHabit, // Pass the new callback
+                            onDismissHabit = onDismissHabit,
                             modifier = Modifier.fillMaxWidth()
                         )
                     }

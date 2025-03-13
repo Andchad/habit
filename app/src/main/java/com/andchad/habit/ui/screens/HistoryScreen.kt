@@ -18,10 +18,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.Button
@@ -29,6 +31,8 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Divider
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
@@ -82,22 +86,47 @@ fun HistoryScreen(
     var showDeleteConfirmation by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
-    // Group history items by date
-    val groupedHistory by remember(habitHistory, selectedDate) {
+    // Filter state
+    var expandedFilterMenu by remember { mutableStateOf(false) }
+    var selectedHabitId by remember { mutableStateOf<String?>(null) }
+
+    // Create list of habits for filtering: "All Habits" + all habits with history
+    val habitOptions = remember(habitHistory, habitNameMap) {
+        val habitIds = habitHistory.map { it.habitId }.distinct()
+        val options = mutableListOf<Pair<String?, String>>()
+        options.add(Pair(null, "All Habits"))
+
+        habitIds.forEach { habitId ->
+            val habitName = habitNameMap[habitId] ?: "Unknown Habit"
+            options.add(Pair(habitId, habitName))
+        }
+        options
+    }
+
+    // Get the currently selected filter name for display
+    val currentFilterName = remember(selectedHabitId, habitOptions) {
+        habitOptions.find { it.first == selectedHabitId }?.second ?: "All Habits"
+    }
+
+    // Group history items by date and apply filter
+    val groupedHistory by remember(habitHistory, selectedDate, selectedHabitId) {
         derivedStateOf {
             // Convert selected date to start and end of day in milliseconds
             val startOfDay = selectedDate.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
             val endOfDay = selectedDate.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli() - 1
 
-            // Filter history for selected date and group
-            habitHistory
+            // Filter history for selected date and potentially by habit ID
+            val filteredHistory = habitHistory
                 .filter { it.date in startOfDay..endOfDay }
-                .groupBy {
-                    // Convert timestamp to LocalDate for display
-                    Instant.ofEpochMilli(it.date)
-                        .atZone(ZoneId.systemDefault())
-                        .toLocalDate()
-                }
+                .filter { selectedHabitId == null || it.habitId == selectedHabitId }
+
+            // Group by date
+            filteredHistory.groupBy {
+                // Convert timestamp to LocalDate for display
+                Instant.ofEpochMilli(it.date)
+                    .atZone(ZoneId.systemDefault())
+                    .toLocalDate()
+            }
         }
     }
 
@@ -186,8 +215,75 @@ fun HistoryScreen(
                 }
             }
 
+            // Filter by habit name
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+            ) {
+                OutlinedCard(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { expandedFilterMenu = true }
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.FilterList,
+                                contentDescription = "Filter",
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = currentFilterName,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                        Icon(
+                            imageVector = Icons.Default.ArrowDropDown,
+                            contentDescription = "Show options"
+                        )
+                    }
+                }
+
+                DropdownMenu(
+                    expanded = expandedFilterMenu,
+                    onDismissRequest = { expandedFilterMenu = false },
+                    modifier = Modifier.fillMaxWidth(0.8f)
+                ) {
+                    habitOptions.forEach { (habitId, name) ->
+                        DropdownMenuItem(
+                            text = { Text(name) },
+                            onClick = {
+                                selectedHabitId = habitId
+                                expandedFilterMenu = false
+                            },
+                            trailingIcon = {
+                                if (habitId == selectedHabitId) {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = "Selected",
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+
             // Delete all history button
             if (habitHistory.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+
                 FilledTonalButton(
                     onClick = { showDeleteConfirmation = true },
                     modifier = Modifier
@@ -205,9 +301,9 @@ fun HistoryScreen(
                     )
                     Text("Clear All History")
                 }
-
-                Spacer(modifier = Modifier.height(8.dp))
             }
+
+            Spacer(modifier = Modifier.height(8.dp))
 
             // Quick date navigation - only show "Yesterday" and "Today" options
             Row(
@@ -272,8 +368,14 @@ fun HistoryScreen(
                         .padding(16.dp),
                     contentAlignment = Alignment.Center
                 ) {
+                    val message = if (selectedHabitId != null) {
+                        "No history for '${currentFilterName}' on this date"
+                    } else {
+                        "No habit records for this date"
+                    }
+
                     Text(
-                        text = "No habit records for this date",
+                        text = message,
                         style = MaterialTheme.typography.bodyLarge,
                         textAlign = TextAlign.Center
                     )

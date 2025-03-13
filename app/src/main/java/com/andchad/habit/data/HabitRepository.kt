@@ -173,4 +173,21 @@ class HabitRepository @Inject constructor(
             android.util.Log.e("HabitRepository", "Error clearing all habit history: ${e.message}")
         }
     }
+
+    /**
+     * Delete a habit and all its history
+     */
+    suspend fun deleteHabitWithHistory(habit: Habit) {
+        try {
+            // Delete the habit
+            habitDao.deleteHabit(habit)
+
+            // Delete all associated history entries
+            habitHistoryDao.deleteHistoryForHabit(habit.id)
+
+            android.util.Log.d("HabitRepository", "Deleted habit and its history: ${habit.name}")
+        } catch (e: Exception) {
+            android.util.Log.e("HabitRepository", "Error deleting habit with history: ${e.message}")
+        }
+    }
 }

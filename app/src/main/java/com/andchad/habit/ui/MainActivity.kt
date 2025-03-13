@@ -33,7 +33,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -57,6 +56,9 @@ import java.time.DayOfWeek
 import javax.inject.Inject
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import kotlinx.coroutines.launch
+import android.provider.Settings
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.outlined.Settings
 
 // Define navigation destinations
 sealed class Screen(val route: String, val title: String, val selectedIcon: (@Composable () -> Unit), val unselectedIcon: (@Composable () -> Unit)) {
@@ -72,9 +74,14 @@ sealed class Screen(val route: String, val title: String, val selectedIcon: (@Co
         { Icon(Icons.Filled.History, contentDescription = "History") },
         { Icon(Icons.Outlined.History, contentDescription = "History") }
     )
+    object Manage : Screen(
+        "manage_habits",
+        "Manage",
+        { Icon(Icons.Filled.Settings, contentDescription = "Manage Habits") },
+        { Icon(Icons.Outlined.Settings, contentDescription = "Manage Habits") }
+    )
     object AddHabit : Screen("add_habit", "Add Habit", { }, { })
     object EditHabit : Screen("edit_habit/{habitId}", "Edit Habit", { }, { })
-    object ManageHabits : Screen("manage_habits", "Manage Habits", { }, { })
 }
 
 @AndroidEntryPoint
@@ -205,8 +212,8 @@ class MainActivity : ComponentActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             val alarmManager = getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
             if (!alarmManager.canScheduleExactAlarms()) {
-                val intent = android.content.Intent().apply {
-                    action = android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM
+                val intent = Intent().apply {
+                    action = Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM
                 }
                 requestAlarmPermissionLauncher.launch(intent)
             }
@@ -232,9 +239,10 @@ fun HabitApp(
     // Counter to limit ad frequency
     var adCounter by remember { mutableStateOf(0) }
 
-    // Bottom nav items
+    // Bottom nav items - reordered with Manage in the middle
     val items = listOf(
         Screen.Habits,
+        Screen.Manage,  // Now in the middle position
         Screen.History
     )
 
@@ -251,7 +259,9 @@ fun HabitApp(
         bottomBar = {
             // Only show bottom nav on main screens
             val currentRoute = currentDestination?.route
-            val showBottomNav = currentRoute == Screen.Habits.route || currentRoute == Screen.History.route
+            val showBottomNav = currentRoute == Screen.Habits.route ||
+                    currentRoute == Screen.History.route ||
+                    currentRoute == Screen.Manage.route
 
             if (showBottomNav) {
                 NavigationBar {
@@ -325,7 +335,7 @@ fun HabitApp(
                     },
                     onManageHabits = {
                         // Navigate to the manage habits screen
-                        navController.navigate(Screen.ManageHabits.route)
+                        navController.navigate(Screen.Manage.route)
                     }
                 )
             }
@@ -338,8 +348,8 @@ fun HabitApp(
                 )
             }
 
-            // Manage Habits screen
-            composable(Screen.ManageHabits.route) {
+            // Manage Habits screen - accessible via middle tab in bottom nav
+            composable(Screen.Manage.route) {
                 ManageHabitsScreen(
                     habits = allHabits,
                     onBack = { navController.popBackStack() },

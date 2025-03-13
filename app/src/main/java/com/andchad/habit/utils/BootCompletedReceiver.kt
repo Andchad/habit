@@ -9,7 +9,9 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -35,24 +37,24 @@ class BootCompletedReceiver : BroadcastReceiver() {
             // Restore all alarms
             scope.launch {
                 try {
-                    val habits = habitRepository.getHabits().first()
+                    habitRepository.getHabits().collect { habits ->
+                        // Only restore alarms for uncompleted habits
+                        val activeHabits = habits.filter { !it.isCompleted }
 
-                    // Only restore alarms for uncompleted habits
-                    val activeHabits = habits.filter { !it.isCompleted }
+                        for (habit in activeHabits) {
+                            alarmUtils.scheduleAlarm(
+                                habitId = habit.id,
+                                habitName = habit.name,
+                                reminderTime = habit.reminderTime,
+                                scheduledDays = habit.scheduledDays,
+                                vibrationEnabled = habit.vibrationEnabled,
+                                snoozeEnabled = habit.snoozeEnabled
+                            )
+                            Log.d(TAG, "Restored alarm for habit: ${habit.name}")
+                        }
 
-                    for (habit in activeHabits) {
-                        alarmUtils.scheduleAlarm(
-                            habitId = habit.id,
-                            habitName = habit.name,
-                            reminderTime = habit.reminderTime,
-                            scheduledDays = habit.scheduledDays,
-                            vibrationEnabled = habit.vibrationEnabled,
-                            snoozeEnabled = habit.snoozeEnabled
-                        )
-                        Log.d(TAG, "Restored alarm for habit: ${habit.name}")
+                        Log.d(TAG, "Restored ${activeHabits.size} alarms")
                     }
-
-                    Log.d(TAG, "Restored ${activeHabits.size} alarms")
                 } catch (e: Exception) {
                     Log.e(TAG, "Error restoring alarms: ${e.message}", e)
                 }

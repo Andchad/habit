@@ -308,10 +308,17 @@ class HabitViewModel @Inject constructor(
 
     fun deleteHabit(habit: Habit) {
         viewModelScope.launch {
-            habitRepository.deleteHabit(habit)
+            try {
+                // Delete only the habit, preserve history
+                habitRepository.deleteHabit(habit)
 
-            // Cancel alarm
-            alarmUtils.cancelAlarm(habit.id)
+                // Cancel alarm
+                alarmUtils.cancelAlarm(habit.id)
+
+                Log.d("HabitViewModel", "Deleted habit: ${habit.name} (history preserved)")
+            } catch (e: Exception) {
+                Log.e("HabitViewModel", "Error deleting habit: ${e.message}", e)
+            }
         }
     }
 
@@ -477,4 +484,6 @@ class HabitViewModel @Inject constructor(
             }
         }
     }
+
+
 }

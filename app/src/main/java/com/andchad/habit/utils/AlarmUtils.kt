@@ -57,8 +57,9 @@ class AlarmUtils @Inject constructor(
         // Find the next occurrence of any of the scheduled days
         val nextAlarmDateTime = findNextAlarmDate(time, scheduledDays)
 
-        // Create the intent for the alarm
+        // Create direct intent for AlarmReceiver
         val intent = Intent(context, AlarmReceiver::class.java).apply {
+            action = "com.andchad.habit.ALARM_TRIGGERED"  // Add explicit action
             putExtra(KEY_HABIT_ID, habitId)
             putExtra(KEY_HABIT_NAME, habitName)
             putExtra(KEY_VIBRATION_ENABLED, vibrationEnabled)
@@ -68,7 +69,7 @@ class AlarmUtils @Inject constructor(
         // Create a unique request code for this habit
         val requestCode = habitId.hashCode()
 
-        // Create the pending intent
+        // Create the pending intent with proper flags
         val pendingIntent = PendingIntent.getBroadcast(
             context,
             requestCode,
@@ -79,49 +80,85 @@ class AlarmUtils @Inject constructor(
         // Get the alarm time in milliseconds
         val alarmTimeMillis = nextAlarmDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
 
-        // Schedule the alarm
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (alarmManager.canScheduleExactAlarms()) {
+        // For debugging
+        Log.d(TAG, "Scheduling alarm for $habitName (ID: $habitId)")
+        Log.d(TAG, "Alarm time: $nextAlarmDateTime (${alarmTimeMillis}ms)")
+
+        try {
+            // Schedule the alarm with the most reliable approach based on OS version
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                if (alarmManager.canScheduleExactAlarms()) {
+                    alarmManager.setExactAndAllowWhileIdle(
+                        AlarmManager.RTC_WAKEUP,
+                        alarmTimeMillis,
+                        pendingIntent
+                    )
+                    Log.d(TAG, "Scheduled exact alarm for $habitName using setExactAndAllowWhileIdle")
+                } else {
+                    // Fall back to inexact alarm if permission not granted
+                    alarmManager.setAndAllowWhileIdle(
+                        AlarmManager.RTC_WAKEUP,
+                        alarmTimeMillis,
+                        pendingIntent
+                    )
+                    Log.d(TAG, "Permission issue - Scheduled inexact alarm for $habitName using setAndAllowWhileIdle")
+                }
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                // For Android 6.0+
                 alarmManager.setExactAndAllowWhileIdle(
                     AlarmManager.RTC_WAKEUP,
                     alarmTimeMillis,
                     pendingIntent
                 )
-                Log.d(TAG, "Scheduled exact alarm for $habitName at $nextAlarmDateTime")
+                Log.d(TAG, "Scheduled exact alarm for $habitName using setExactAndAllowWhileIdle (M+)")
             } else {
-                // Fall back to inexact alarm if permission not granted
-                alarmManager.setAndAllowWhileIdle(
+                // For older versions
+                alarmManager.setExact(
                     AlarmManager.RTC_WAKEUP,
                     alarmTimeMillis,
                     pendingIntent
                 )
-                Log.d(TAG, "Scheduled inexact alarm for $habitName at $nextAlarmDateTime")
+                Log.d(TAG, "Scheduled exact alarm for $habitName using setExact (legacy)")
             }
-        } else {
-            alarmManager.setExactAndAllowWhileIdle(
-                AlarmManager.RTC_WAKEUP,
-                alarmTimeMillis,
-                pendingIntent
-            )
-            Log.d(TAG, "Scheduled exact alarm for $habitName at $nextAlarmDateTime")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error scheduling alarm: ${e.message}", e)
+
+            // Fallback approach if the first attempt fails
+            try {
+                alarmManager.set(
+                    AlarmManager.RTC_WAKEUP,
+                    alarmTimeMillis,
+                    pendingIntent
+                )
+                Log.d(TAG, "Fallback: Scheduled alarm using basic set() method")
+            } catch (e2: Exception) {
+                Log.e(TAG, "Error in fallback alarm scheduling: ${e2.message}", e2)
+            }
         }
     }
 
     fun cancelAlarm(habitId: String) {
-        val intent = Intent(context, AlarmReceiver::class.java)
+        val intent = Intent(context, AlarmReceiver::class.java).apply {
+            action = "com.andchad.habit.ALARM_TRIGGERED"  // Match the action
+        }
+
         val requestCode = habitId.hashCode()
 
         val pendingIntent = PendingIntent.getBroadcast(
             context,
             requestCode,
             intent,
-            PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_NO_CREATE
         )
 
-        if (pendingIntent != null) {
-            alarmManager.cancel(pendingIntent)
-            pendingIntent.cancel()
-            Log.d(TAG, "Cancelled alarm for habit ID: $habitId")
+        try {
+            if (pendingIntent != null) {
+                alarmManager.cancel(pendingIntent)
+                pendingIntent.cancel()
+                Log.d(TAG, "Cancelled alarm for habit ID: $habitId")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error cancelling alarm: ${e.message}", e)
         }
     }
 
@@ -132,6 +169,7 @@ class AlarmUtils @Inject constructor(
     ) {
         // Create the intent for the snoozed alarm
         val intent = Intent(context, AlarmReceiver::class.java).apply {
+            action = "com.andchad.habit.ALARM_TRIGGERED"  // Same action for consistency
             putExtra(KEY_HABIT_ID, habitId)
             putExtra(KEY_HABIT_NAME, habitName)
             putExtra(KEY_VIBRATION_ENABLED, vibrationEnabled)
@@ -152,30 +190,34 @@ class AlarmUtils @Inject constructor(
         // Calculate snooze time (current time + snooze duration)
         val snoozeTimeMillis = System.currentTimeMillis() + (SNOOZE_TIME_MINUTES * 60 * 1000)
 
-        // Schedule the snoozed alarm
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (alarmManager.canScheduleExactAlarms()) {
+        try {
+            // Schedule the snoozed alarm
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                if (alarmManager.canScheduleExactAlarms()) {
+                    alarmManager.setExactAndAllowWhileIdle(
+                        AlarmManager.RTC_WAKEUP,
+                        snoozeTimeMillis,
+                        pendingIntent
+                    )
+                } else {
+                    alarmManager.setAndAllowWhileIdle(
+                        AlarmManager.RTC_WAKEUP,
+                        snoozeTimeMillis,
+                        pendingIntent
+                    )
+                }
+            } else {
                 alarmManager.setExactAndAllowWhileIdle(
                     AlarmManager.RTC_WAKEUP,
                     snoozeTimeMillis,
                     pendingIntent
                 )
-            } else {
-                alarmManager.setAndAllowWhileIdle(
-                    AlarmManager.RTC_WAKEUP,
-                    snoozeTimeMillis,
-                    pendingIntent
-                )
             }
-        } else {
-            alarmManager.setExactAndAllowWhileIdle(
-                AlarmManager.RTC_WAKEUP,
-                snoozeTimeMillis,
-                pendingIntent
-            )
-        }
 
-        Log.d(TAG, "Scheduled snooze alarm for $habitName in $SNOOZE_TIME_MINUTES minutes")
+            Log.d(TAG, "Scheduled snooze alarm for $habitName in $SNOOZE_TIME_MINUTES minutes")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error scheduling snooze alarm: ${e.message}", e)
+        }
     }
 
     private fun findNextAlarmDate(time: LocalTime, scheduledDays: List<DayOfWeek>): LocalDateTime {

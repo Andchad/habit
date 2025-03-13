@@ -33,7 +33,7 @@ import com.andchad.habit.data.model.Habit
 fun PastDueHabitList(
     pastDueHabits: List<Habit>,
     onToggleComplete: (String, Boolean) -> Unit,
-    onDismissHabit: (String) -> Unit, // New callback for dismissing
+    onDismissHabit: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -92,7 +92,7 @@ fun PastDueHabitList(
 
                     Spacer(modifier = Modifier.width(8.dp))
 
-                    // Dismiss button
+                    // Skip button
                     OutlinedButton(
                         onClick = { onDismissHabit(habit.id) },
                         colors = ButtonDefaults.outlinedButtonColors(
@@ -102,7 +102,7 @@ fun PastDueHabitList(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
-                            contentDescription = null,
+                            contentDescription = "Skip",
                             modifier = Modifier.padding(end = 4.dp)
                         )
                         Text(text = "Skip")
@@ -117,7 +117,7 @@ fun PastDueHabitList(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Check,
-                            contentDescription = null,
+                            contentDescription = "Done",
                             modifier = Modifier.padding(end = 4.dp)
                         )
                         Text(text = "Done")

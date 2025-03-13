@@ -13,6 +13,11 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
+    <!-- Add to your AndroidManifest.xml permissions section -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.DISABLE_KEYGUARD" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <application
         android:name=".HabitApplication"
         android:allowBackup="true"
@@ -57,27 +62,29 @@
             android:name=".ui.AlarmActivity"
             android:exported="false"
             android:theme="@style/Theme.Habit"
-            android:showOnLockScreen="true" />
+            android:showOnLockScreen="true"
+            android:launchMode="singleTask"
+            android:turnScreenOn="true"
+            android:showWhenLocked="true" />
 
         <!-- Alarm Receiver -->
         <receiver
             android:name=".utils.AlarmReceiver"
             android:enabled="true"
-            android:exported="false" />
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
 
-        <!-- Snooze Receiver -->
-        <receiver
-            android:name=".utils.SnoozeReceiver"
-            android:enabled="true"
-            android:exported="false" />
-
-        <!-- Boot Completed Receiver to restart alarms after device reboot -->
+        <!-- Boot Completed Receiver -->
         <receiver
             android:name=".utils.BootCompletedReceiver"
             android:enabled="true"
-            android:exported="false">
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
             </intent-filter>
         </receiver>
 

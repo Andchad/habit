@@ -35,4 +35,7 @@ interface HabitHistoryDao {
 
     @Query("DELETE FROM habit_history")
     suspend fun deleteAllHabitHistory()
+
+    @Query("DELETE FROM habit_history WHERE habitId = :habitId")
+    suspend fun deleteHistoryForHabit(habitId: String)
 }

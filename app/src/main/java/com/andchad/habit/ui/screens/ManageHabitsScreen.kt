@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -33,7 +32,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.andchad.habit.data.model.Habit
@@ -43,7 +41,7 @@ import com.andchad.habit.ui.screens.components.HabitItemCard
 @Composable
 fun ManageHabitsScreen(
     habits: List<Habit>,
-    onBack: () -> Unit,
+    onBack: () -> Unit, // Kept for compatibility but not used
     onEditHabit: (Habit) -> Unit,
     onDeleteHabit: (Habit) -> Unit,
     onDeleteAllHabits: () -> Unit,
@@ -83,14 +81,6 @@ fun ManageHabitsScreen(
         topBar = {
             TopAppBar(
                 title = { Text("Manage Habits") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Back"
-                        )
-                    }
-                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
@@ -132,10 +122,29 @@ fun ManageHabitsScreen(
                 Column(
                     modifier = Modifier.fillMaxSize()
                 ) {
+                    // Delete all button at the top
+                    FilledTonalButton(
+                        onClick = { showDeleteAllConfirmation = true },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                            contentColor = MaterialTheme.colorScheme.error
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Delete All Habits",
+                            modifier = Modifier.padding(end = 8.dp)
+                        )
+                        Text("Delete All Habits")
+                    }
+
                     Text(
                         text = "All Habits (${habits.size})",
                         style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                     )
 
                     LazyColumn(
