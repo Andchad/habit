@@ -32,4 +32,7 @@ interface HabitHistoryDao {
 
     @Query("SELECT * FROM habit_history WHERE habitId = :habitId AND date >= :startDate ORDER BY date ASC LIMIT :streakThreshold")
     fun getRecentHistoryForHabit(habitId: String, startDate: Long, streakThreshold: Int): Flow<List<HabitHistory>>
+
+    @Query("DELETE FROM habit_history")
+    suspend fun deleteAllHabitHistory()
 }

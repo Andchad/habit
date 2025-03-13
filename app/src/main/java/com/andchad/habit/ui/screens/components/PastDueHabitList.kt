@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -17,6 +18,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Divider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -31,6 +33,7 @@ import com.andchad.habit.data.model.Habit
 fun PastDueHabitList(
     pastDueHabits: List<Habit>,
     onToggleComplete: (String, Boolean) -> Unit,
+    onDismissHabit: (String) -> Unit, // New callback for dismissing
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -89,6 +92,23 @@ fun PastDueHabitList(
 
                     Spacer(modifier = Modifier.width(8.dp))
 
+                    // Dismiss button
+                    OutlinedButton(
+                        onClick = { onDismissHabit(habit.id) },
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
+                        ),
+                        modifier = Modifier.padding(end = 8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = null,
+                            modifier = Modifier.padding(end = 4.dp)
+                        )
+                        Text(text = "Skip")
+                    }
+
+                    // Mark Done button
                     Button(
                         onClick = { onToggleComplete(habit.id, true) },
                         colors = ButtonDefaults.buttonColors(
@@ -100,7 +120,7 @@ fun PastDueHabitList(
                             contentDescription = null,
                             modifier = Modifier.padding(end = 4.dp)
                         )
-                        Text(text = "Mark Done")
+                        Text(text = "Done")
                     }
                 }
 

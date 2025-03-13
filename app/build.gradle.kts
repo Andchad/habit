@@ -107,6 +107,9 @@ dependencies {
     // Compose foundation pager (for wheel picker)
     implementation("androidx.compose.foundation:foundation:1.5.4")
 
+    // LocalBroadcastManager
+    implementation("androidx.localbroadcastmanager:localbroadcastmanager:1.1.0")
+
 }
 
 // Allow references to generated code

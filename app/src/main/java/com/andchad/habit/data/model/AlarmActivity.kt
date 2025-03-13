@@ -7,6 +7,7 @@ import android.util.Log
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.viewModels
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,23 +21,33 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Alarm
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.andchad.habit.data.model.HabitHistory
+import com.andchad.habit.data.model.HabitStatus
 import com.andchad.habit.ui.theme.HabitTheme
 import com.andchad.habit.utils.AlarmUtils
+import com.andchad.habit.utils.HabitBroadcastManager
 import dagger.hilt.android.AndroidEntryPoint
+import java.time.LocalDate
+import java.time.ZoneId
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -45,12 +56,18 @@ class AlarmActivity : ComponentActivity() {
     @Inject
     lateinit var alarmUtils: AlarmUtils
 
+    // Use the shared ViewModel to directly update habit states
+    private val viewModel: HabitViewModel by viewModels()
+
     private var mediaPlayer: MediaPlayer? = null
     private val TAG = "AlarmActivity"
 
     companion object {
         // Static variable to track if this activity is in the foreground
         private var isActivityVisible = false
+
+        // New flag to track if the UI needs to be refreshed
+        var needsRefresh = false
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -83,6 +100,26 @@ class AlarmActivity : ComponentActivity() {
                         habitName = habitName,
                         snoozeEnabled = snoozeEnabled,
                         onDismiss = {
+                            // Set the needs refresh flag
+                            needsRefresh = true
+
+                            // Directly call viewModel to dismiss habit
+                            Log.d(TAG, "Dismissing habit: $habitId ($habitName)")
+                            viewModel.dismissHabit(habitId)
+
+                            // Stop alarm and close activity
+                            stopAlarmSound()
+                            finish()
+                        },
+                        onComplete = {
+                            // Set the needs refresh flag
+                            needsRefresh = true
+
+                            // Directly call viewModel to complete habit
+                            Log.d(TAG, "Completing habit: $habitId ($habitName)")
+                            viewModel.completeHabit(habitId, true)
+
+                            // Stop alarm and close activity
                             stopAlarmSound()
                             finish()
                         },
@@ -161,6 +198,7 @@ fun AlarmScreen(
     habitName: String,
     snoozeEnabled: Boolean,
     onDismiss: () -> Unit,
+    onComplete: () -> Unit,  // Added new callback for completion
     onSnooze: () -> Unit
 ) {
     // Clean up resources when leaving the composition
@@ -211,12 +249,42 @@ fun AlarmScreen(
 
             Spacer(modifier = Modifier.height(48.dp))
 
+            // Complete habit button
             Button(
-                onClick = onDismiss,
-                modifier = Modifier.fillMaxWidth()
+                onClick = onComplete,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.tertiary
+                )
             ) {
+                Icon(
+                    imageVector = Icons.Default.Check,
+                    contentDescription = "Complete",
+                    modifier = Modifier.padding(end = 8.dp)
+                )
                 Text(
-                    text = "Dismiss",
+                    text = "Mark as Completed",
+                    fontSize = 18.sp
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Changed to OutlinedButton for visual distinction
+            OutlinedButton(
+                onClick = onDismiss,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                )
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Skip",
+                    modifier = Modifier.padding(end = 8.dp)
+                )
+                Text(
+                    text = "Skip For Today",
                     fontSize = 18.sp
                 )
             }
@@ -226,7 +294,10 @@ fun AlarmScreen(
 
                 Button(
                     onClick = onSnooze,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.secondary
+                    )
                 ) {
                     Text(
                         text = "Snooze for ${AlarmUtils.SNOOZE_TIME_MINUTES} minutes",

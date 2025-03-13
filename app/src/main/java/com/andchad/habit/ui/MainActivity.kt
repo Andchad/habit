@@ -1,8 +1,12 @@
 package com.andchad.habit.ui
 
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -47,6 +51,7 @@ import com.andchad.habit.ui.screens.HistoryScreen
 import com.andchad.habit.ui.screens.ManageHabitsScreen
 import com.andchad.habit.ui.theme.HabitTheme
 import com.andchad.habit.utils.AdManager
+import com.andchad.habit.utils.HabitBroadcastManager
 import dagger.hilt.android.AndroidEntryPoint
 import java.time.DayOfWeek
 import javax.inject.Inject
@@ -69,7 +74,7 @@ sealed class Screen(val route: String, val title: String, val selectedIcon: (@Co
     )
     object AddHabit : Screen("add_habit", "Add Habit", { }, { })
     object EditHabit : Screen("edit_habit/{habitId}", "Edit Habit", { }, { })
-    object ManageHabits : Screen("manage_habits", "Manage Habits", { }, { }) // New route
+    object ManageHabits : Screen("manage_habits", "Manage Habits", { }, { })
 }
 
 @AndroidEntryPoint
@@ -82,6 +87,50 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         private var hasAppLaunched = false
+    }
+
+    // Broadcast receiver for habit updates
+    private val habitUpdateReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            when (intent.action) {
+                HabitBroadcastManager.ACTION_ALARM_DISMISSED -> {
+                    val habitId = intent.getStringExtra(HabitBroadcastManager.EXTRA_HABIT_ID) ?: return
+                    val habitName = intent.getStringExtra(HabitBroadcastManager.EXTRA_HABIT_NAME) ?: "Unknown"
+
+                    // Mark the habit as missed (dismissed) in the database and update UI
+                    viewModel.dismissHabit(habitId)
+
+                    // Show user feedback
+                    Toast.makeText(
+                        this@MainActivity,
+                        "Habit '$habitName' skipped for today",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+                HabitBroadcastManager.ACTION_ALARM_COMPLETED -> {
+                    val habitId = intent.getStringExtra(HabitBroadcastManager.EXTRA_HABIT_ID) ?: return
+                    val habitName = intent.getStringExtra(HabitBroadcastManager.EXTRA_HABIT_NAME) ?: "Unknown"
+
+                    // Mark the habit as completed in the database and update UI
+                    viewModel.completeHabit(habitId, true)
+
+                    // Show user feedback
+                    Toast.makeText(
+                        this@MainActivity,
+                        "Habit '$habitName' completed!",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+                HabitBroadcastManager.ACTION_HABIT_UPDATE -> {
+                    // Handle general habit updates if needed
+                    val habitId = intent.getStringExtra(HabitBroadcastManager.EXTRA_HABIT_ID) ?: return
+                    val actionType = intent.getStringExtra(HabitBroadcastManager.EXTRA_ACTION_TYPE) ?: return
+
+                    // Update UI based on action type if needed
+                    Log.d("MainActivity", "Received habit update: $actionType for habit $habitId")
+                }
+            }
+        }
     }
 
     // Permission launcher for alarm permission
@@ -123,8 +172,30 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        // Register the broadcast receiver
+        HabitBroadcastManager.registerReceiver(this, habitUpdateReceiver)
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // Unregister the broadcast receiver
+        HabitBroadcastManager.unregisterReceiver(this, habitUpdateReceiver)
+    }
+
     override fun onResume() {
         super.onResume()
+
+        // Check if we need to refresh the UI after alarm activity
+        if (AlarmActivity.needsRefresh) {
+            Log.d("MainActivity", "Force refreshing UI after alarm activity")
+            // Set flag back to false
+            AlarmActivity.needsRefresh = false
+
+            // Force refresh the ViewModel data
+            viewModel.forceRefreshHabits()
+        }
 
         // Ensure an ad is loaded and ready to show
         adManager.ensureAdLoaded()
@@ -246,6 +317,12 @@ fun HabitApp(
                     onToggleCompleteHabit = { id, isCompleted ->
                         viewModel.completeHabit(id, isCompleted)
                     },
+                    onDismissHabit = { id ->
+                        viewModel.dismissHabit(id)
+                        scope.launch {
+                            snackbarHostState.showSnackbar("Habit skipped for today")
+                        }
+                    },
                     onManageHabits = {
                         // Navigate to the manage habits screen
                         navController.navigate(Screen.ManageHabits.route)
@@ -261,7 +338,7 @@ fun HabitApp(
                 )
             }
 
-            // New Manage Habits screen
+            // Manage Habits screen
             composable(Screen.ManageHabits.route) {
                 ManageHabitsScreen(
                     habits = allHabits,

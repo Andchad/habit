@@ -48,6 +48,7 @@ fun HabitListScreen(
     onEditHabit: (Habit) -> Unit,
     onDeleteHabit: (Habit) -> Unit,
     onToggleCompleteHabit: (String, Boolean) -> Unit,
+    onDismissHabit: (String) -> Unit, // New callback for dismissing habits
     onManageHabits: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -131,6 +132,7 @@ fun HabitListScreen(
                         PastDueHabitList(
                             pastDueHabits = pastDueHabits,
                             onToggleComplete = onToggleCompleteHabit,
+                            onDismissHabit = onDismissHabit, // Pass the new callback
                             modifier = Modifier.fillMaxWidth()
                         )
                     }

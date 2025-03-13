@@ -1,6 +1,7 @@
 package com.andchad.habit.ui
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.andchad.habit.data.HabitRepository
@@ -256,32 +257,51 @@ class HabitViewModel @Inject constructor(
 
     fun completeHabit(id: String, isCompleted: Boolean) {
         viewModelScope.launch {
-            habitRepository.completeHabit(id, isCompleted)
+            Log.d("HabitViewModel", "Completing habit: $id, isCompleted: $isCompleted")
 
-            // If marked as completed, cancel the alarm and record history
-            if (isCompleted) {
-                alarmUtils.cancelAlarm(id)
+            try {
+                // Update in local database
+                habitRepository.completeHabit(id, isCompleted)
 
-                // Record completion in history
-                val habit = _allHabits.value.find { it.id == id }
-                if (habit != null) {
-                    val today = LocalDate.now()
-                    val timestamp = today.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
-
-                    val historyEntry = HabitHistory(
-                        habitId = habit.id,
-                        date = timestamp,
-                        status = HabitStatus.COMPLETED
-                    )
-
-                    habitRepository.saveHabitHistory(historyEntry)
+                // Immediately update local state for UI
+                val updatedHabits = _allHabits.value.map {
+                    if (it.id == id) it.copy(isCompleted = isCompleted) else it
                 }
-            } else {
-                // Re-schedule alarm if marked as not completed
-                val habit = _allHabits.value.find { it.id == id }
-                if (habit != null) {
-                    scheduleHabitAlarm(habit.copy(isCompleted = false))
+                _allHabits.value = updatedHabits
+                Log.d("HabitViewModel", "Updated _allHabits state for completed habit")
+
+                // If marked as completed, cancel the alarm and record history
+                if (isCompleted) {
+                    alarmUtils.cancelAlarm(id)
+
+                    // Record completion in history
+                    val habit = _allHabits.value.find { it.id == id }
+                    if (habit != null) {
+                        val today = LocalDate.now()
+                        val timestamp = today.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+
+                        val historyEntry = HabitHistory(
+                            habitId = habit.id,
+                            date = timestamp,
+                            status = HabitStatus.COMPLETED
+                        )
+
+                        habitRepository.saveHabitHistory(historyEntry)
+                        Log.d("HabitViewModel", "Saved completed history entry for habit: ${habit.name}")
+                    }
+                } else {
+                    // Re-schedule alarm if marked as not completed
+                    val habit = _allHabits.value.find { it.id == id }
+                    if (habit != null) {
+                        scheduleHabitAlarm(habit.copy(isCompleted = false))
+                    }
                 }
+
+                // After updates are complete, reapply habits filter to update UI
+                applyHabitsFilter()
+                Log.d("HabitViewModel", "Applied habits filter after completion state change")
+            } catch (e: Exception) {
+                Log.e("HabitViewModel", "Error completing habit: ${e.message}", e)
             }
         }
     }
@@ -355,6 +375,105 @@ class HabitViewModel @Inject constructor(
                     }
             } catch (e: Exception) {
                 android.util.Log.e("HabitViewModel", "Error loading history for date range: ${e.message}")
+            }
+        }
+    }
+
+
+    /**
+     * Mark a habit as missed for today
+     */
+    fun dismissHabit(id: String) {
+        viewModelScope.launch {
+            Log.d("HabitViewModel", "Dismissing habit: $id")
+
+            val habit = _allHabits.value.find { it.id == id }
+            if (habit != null) {
+                Log.d("HabitViewModel", "Found habit to dismiss: ${habit.name}")
+
+                try {
+                    // Cancel alarm for today
+                    alarmUtils.cancelAlarm(id)
+
+                    // Record missed status in history
+                    val today = LocalDate.now()
+                    val timestamp =
+                        today.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+
+                    val historyEntry = HabitHistory(
+                        habitId = habit.id,
+                        date = timestamp,
+                        status = HabitStatus.MISSED
+                    )
+
+                    habitRepository.saveHabitHistory(historyEntry)
+                    Log.d("HabitViewModel", "Saved missed history entry for habit: ${habit.name}")
+
+                    // Mark as completed temporarily to handle UI state
+                    // This removes it from past due list
+                    habitRepository.completeHabit(id, true)
+
+                    // Immediately update the local state to reflect the change
+                    // This forces a UI update without waiting for Flow collection
+                    val updatedHabits = _allHabits.value.map {
+                        if (it.id == id) it.copy(isCompleted = true) else it
+                    }
+                    _allHabits.value = updatedHabits
+                    Log.d("HabitViewModel", "Updated _allHabits state for dismissed habit")
+
+                    // Re-schedule the habit for its next occurrence if needed
+                    val updatedHabit = updatedHabits.find { it.id == id }
+                    if (updatedHabit != null) {
+                        // Schedule for next occurrence
+                        scheduleHabitAlarm(updatedHabit)
+                    }
+
+                    // After updates are complete, reapply habits filter to update UI
+                    applyHabitsFilter()
+                    Log.d("HabitViewModel", "Applied habits filter after dismissal")
+                } catch (e: Exception) {
+                    Log.e("HabitViewModel", "Error dismissing habit: ${e.message}", e)
+                }
+            } else {
+                Log.e("HabitViewModel", "Could not find habit with ID: $id")
+            }
+        }
+    }
+
+    fun forceRefreshHabits() {
+        viewModelScope.launch {
+            try {
+                // Get the latest data from repository
+                val latestHabits = habitRepository.getHabits().first()
+
+                // Update the allHabits state with the latest data
+                _allHabits.value = latestHabits
+
+                // Apply filtering and sorting to update the UI
+                applyHabitsFilter()
+
+                Log.d("HabitViewModel", "Habits refreshed: ${latestHabits.size} habits")
+            } catch (e: Exception) {
+                Log.e("HabitViewModel", "Error refreshing habits: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Deletes all habit history entries from the database
+     */
+    fun clearAllHabitHistory() {
+        viewModelScope.launch {
+            try {
+                // Delete all history entries from the repository
+                habitRepository.clearAllHabitHistory()
+
+                // Update the local state to reflect the empty history
+                _habitHistory.value = emptyList()
+
+                Log.d("HabitViewModel", "All habit history cleared")
+            } catch (e: Exception) {
+                Log.e("HabitViewModel", "Error clearing habit history: ${e.message}", e)
             }
         }
     }

@@ -162,4 +162,15 @@ class HabitRepository @Inject constructor(
             android.util.Log.e("HabitRepository", "Error recording habit histories: ${e.message}")
         }
     }
+
+    /**
+     * Clear all habit history entries
+     */
+    suspend fun clearAllHabitHistory() {
+        try {
+            habitHistoryDao.deleteAllHabitHistory()
+        } catch (e: Exception) {
+            android.util.Log.e("HabitRepository", "Error clearing all habit history: ${e.message}")
+        }
+    }
 }

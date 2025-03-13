@@ -41,6 +41,13 @@ class AlarmReceiver : BroadcastReceiver() {
         val vibrationEnabled = intent.getBooleanExtra(AlarmUtils.KEY_VIBRATION_ENABLED, false)
         val snoozeEnabled = intent.getBooleanExtra(AlarmUtils.KEY_SNOOZE_ENABLED, false)
 
+        // Notify that an alarm is active (for UI updates)
+        HabitBroadcastManager.sendHabitUpdateBroadcast(
+            context,
+            habitId,
+            HabitBroadcastManager.ACTION_TYPE_DISMISSED
+        )
+
         // Launch the alarm activity
         val alarmIntent = Intent(context, AlarmActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK
@@ -56,9 +63,6 @@ class AlarmReceiver : BroadcastReceiver() {
         if (vibrationEnabled) {
             vibrate(context)
         }
-
-        // NOTE: Removed playAlarmSound method call from here
-        // Let AlarmActivity handle playing and stopping the sound
     }
 
     private fun vibrate(context: Context) {

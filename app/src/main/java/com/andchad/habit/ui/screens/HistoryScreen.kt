@@ -21,14 +21,18 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Scaffold
@@ -41,6 +45,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -52,6 +57,7 @@ import androidx.compose.ui.unit.dp
 import com.andchad.habit.data.model.HabitHistory
 import com.andchad.habit.data.model.HabitStatus
 import com.andchad.habit.ui.HabitViewModel
+import com.andchad.habit.ui.screens.components.DeleteConfirmationDialog
 import java.time.Instant
 import java.time.LocalDate
 import java.time.YearMonth
@@ -59,6 +65,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -72,6 +79,8 @@ fun HistoryScreen(
     val today = LocalDate.now()
     var selectedDate by remember { mutableStateOf(today) }
     var showCalendar by remember { mutableStateOf(false) }
+    var showDeleteConfirmation by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
 
     // Group history items by date
     val groupedHistory by remember(habitHistory, selectedDate) {
@@ -92,6 +101,20 @@ fun HistoryScreen(
         }
     }
 
+    if (showDeleteConfirmation) {
+        DeleteConfirmationDialog(
+            title = "Delete All History",
+            message = "Are you sure you want to delete all habit history? This action cannot be undone.",
+            onConfirm = {
+                viewModel.clearAllHabitHistory()
+                showDeleteConfirmation = false
+            },
+            onDismiss = {
+                showDeleteConfirmation = false
+            }
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -99,7 +122,23 @@ fun HistoryScreen(
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                )
+                ),
+                actions = {
+                    // Add Delete All button
+                    IconButton(
+                        onClick = { showDeleteConfirmation = true },
+                        enabled = habitHistory.isNotEmpty()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Delete All History",
+                            tint = if (habitHistory.isNotEmpty())
+                                MaterialTheme.colorScheme.error
+                            else
+                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                        )
+                    }
+                }
             )
         }
     ) { paddingValues ->
@@ -145,6 +184,29 @@ fun HistoryScreen(
                         Text("Select Date")
                     }
                 }
+            }
+
+            // Delete all history button
+            if (habitHistory.isNotEmpty()) {
+                FilledTonalButton(
+                    onClick = { showDeleteConfirmation = true },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    colors = ButtonDefaults.filledTonalButtonColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                        contentColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "Delete All History",
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
+                    Text("Clear All History")
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
             }
 
             // Quick date navigation - only show "Yesterday" and "Today" options
