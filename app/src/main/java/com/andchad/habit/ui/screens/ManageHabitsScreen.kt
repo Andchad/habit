@@ -34,7 +34,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.andchad.habit.data.model.Habit
+import com.andchad.habit.ui.components.ModernTopAppBar
 import com.andchad.habit.ui.screens.components.HabitItemCard
+import androidx.compose.ui.graphics.Color
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -79,12 +81,8 @@ fun ManageHabitsScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Manage Habits") },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                ),
+            ModernTopAppBar(
+                title = "Manage Habits",
                 actions = {
                     IconButton(
                         onClick = { showDeleteAllConfirmation = true },
@@ -94,9 +92,9 @@ fun ManageHabitsScreen(
                             imageVector = Icons.Default.Delete,
                             contentDescription = "Delete All",
                             tint = if (habits.isNotEmpty())
-                                MaterialTheme.colorScheme.error
+                                Color.White
                             else
-                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                                Color.White.copy(alpha = 0.38f)
                         )
                     }
                 }

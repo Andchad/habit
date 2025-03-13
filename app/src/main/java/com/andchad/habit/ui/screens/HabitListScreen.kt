@@ -26,8 +26,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.andchad.habit.data.model.Habit
+import com.andchad.habit.ui.components.ModernTopAppBar
 import com.andchad.habit.ui.screens.components.HabitItemCard
 import com.andchad.habit.ui.screens.components.PastDueHabitList
+import androidx.compose.ui.graphics.Color
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -49,18 +51,14 @@ fun HabitListScreen(
 ) {
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Hab-it!") },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                ),
+            ModernTopAppBar(
+                title = "Hab-it!",
                 actions = {
-                    // Only keep the Dark Mode toggle
                     IconButton(onClick = onToggleDarkMode) {
                         Icon(
                             imageVector = if (isDarkMode) Icons.Default.LightMode else Icons.Default.DarkMode,
-                            contentDescription = if (isDarkMode) "Switch to Light Mode" else "Switch to Dark Mode"
+                            contentDescription = if (isDarkMode) "Switch to Light Mode" else "Switch to Dark Mode",
+                            tint = Color.White
                         )
                     }
                 }

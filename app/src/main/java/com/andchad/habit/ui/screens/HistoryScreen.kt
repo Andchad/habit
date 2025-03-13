@@ -61,6 +61,7 @@ import androidx.compose.ui.unit.dp
 import com.andchad.habit.data.model.HabitHistory
 import com.andchad.habit.data.model.HabitStatus
 import com.andchad.habit.ui.HabitViewModel
+import com.andchad.habit.ui.components.ModernTopAppBar
 import com.andchad.habit.ui.screens.components.DeleteConfirmationDialog
 import java.time.Instant
 import java.time.LocalDate
@@ -146,14 +147,9 @@ fun HistoryScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Habit History") },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                ),
+            ModernTopAppBar(
+                title = "Habit History",
                 actions = {
-                    // Add Delete All button
                     IconButton(
                         onClick = { showDeleteConfirmation = true },
                         enabled = habitHistory.isNotEmpty()
@@ -162,14 +158,14 @@ fun HistoryScreen(
                             imageVector = Icons.Default.Delete,
                             contentDescription = "Delete All History",
                             tint = if (habitHistory.isNotEmpty())
-                                MaterialTheme.colorScheme.error
+                                Color.White
                             else
-                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                                Color.White.copy(alpha = 0.38f)
                         )
                     }
                 }
             )
-        }
+        },
     ) { paddingValues ->
         Column(
             modifier = modifier
