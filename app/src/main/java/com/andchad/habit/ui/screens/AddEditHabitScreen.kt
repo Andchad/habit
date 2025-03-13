@@ -38,7 +38,7 @@ import com.andchad.habit.data.model.Habit
 import com.andchad.habit.ui.HabitViewModel
 import com.andchad.habit.ui.screens.components.AlarmSettingsComponent
 import com.andchad.habit.ui.screens.components.DaySelector
-import com.andchad.habit.ui.screens.components.WheelTimePicker
+import com.andchad.habit.ui.screens.components.TextFieldTimePicker
 import com.andchad.habit.ui.screens.components.formatTime
 import java.time.DayOfWeek
 import java.time.LocalTime
@@ -85,7 +85,7 @@ fun AddEditHabitScreen(
     }
 
     if (showTimePicker) {
-        WheelTimePicker(
+        TextFieldTimePicker(
             initialHour = initialTime.first,
             initialMinute = initialTime.second,
             onCancel = { showTimePicker = false },
@@ -146,7 +146,6 @@ fun AddEditHabitScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Make the entire time field clickable
             OutlinedTextField(
                 value = selectedTime,
                 onValueChange = { },
@@ -159,14 +158,10 @@ fun AddEditHabitScreen(
                     Icon(
                         imageVector = Icons.Default.Timer,
                         contentDescription = "Set Time",
-                        // Make the icon appear non-clickable by reducing alpha
-                        // since the entire field is now clickable
                         modifier = Modifier.alpha(0.7f)
                     )
                 },
-                // Ensure text field isn't highlighted when clicked
                 enabled = false,
-                // Keep text color visible even though field is disabled
                 colors = androidx.compose.material3.TextFieldDefaults.outlinedTextFieldColors(
                     disabledTextColor = MaterialTheme.colorScheme.onSurface,
                     disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,

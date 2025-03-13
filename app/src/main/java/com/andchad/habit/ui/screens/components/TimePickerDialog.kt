@@ -81,8 +81,8 @@ fun TimePickerDialog(
     }
 }
 
-// Function to format LocalTime as string
-fun formatTime(hour: Int, minute: Int): String {
-    val time = LocalTime.of(hour, minute)
-    return time.format(DateTimeFormatter.ofPattern("HH:mm"))
-}
+//// Function to format LocalTime as string
+//fun formatTime(hour: Int, minute: Int): String {
+//    val time = LocalTime.of(hour, minute)
+//    return time.format(DateTimeFormatter.ofPattern("HH:mm"))
+//}

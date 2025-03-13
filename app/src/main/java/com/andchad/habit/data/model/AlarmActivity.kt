@@ -12,13 +12,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.Check
@@ -34,6 +34,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -43,6 +45,9 @@ import androidx.compose.ui.unit.sp
 import com.andchad.habit.data.model.HabitHistory
 import com.andchad.habit.data.model.HabitStatus
 import com.andchad.habit.ui.theme.HabitTheme
+import com.andchad.habit.ui.theme.Primary
+import com.andchad.habit.ui.theme.Secondary
+import com.andchad.habit.ui.theme.Tertiary
 import com.andchad.habit.utils.AlarmUtils
 import com.andchad.habit.utils.HabitBroadcastManager
 import dagger.hilt.android.AndroidEntryPoint
@@ -96,7 +101,7 @@ class AlarmActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    AlarmScreen(
+                    AlarmScreenWithMatchingColors(
                         habitName = habitName,
                         snoozeEnabled = snoozeEnabled,
                         onDismiss = {
@@ -194,11 +199,11 @@ class AlarmActivity : ComponentActivity() {
 }
 
 @Composable
-fun AlarmScreen(
+fun AlarmScreenWithMatchingColors(
     habitName: String,
     snoozeEnabled: Boolean,
     onDismiss: () -> Unit,
-    onComplete: () -> Unit,  // Added new callback for completion
+    onComplete: () -> Unit,
     onSnooze: () -> Unit
 ) {
     // Clean up resources when leaving the composition
@@ -208,10 +213,19 @@ fun AlarmScreen(
         }
     }
 
+    // Define colors that match your splash screen (darker teal/blue gradient)
+    val darkTeal = Color(0xFF2C3E50)  // Matching Secondary from your theme
+    val lightTeal = Color(0xFF4CA1AF)  // Matching Primary from your theme
+
+    // Create a gradient background matching your splash screen
+    val gradientBackground = Brush.verticalGradient(
+        colors = listOf(darkTeal, lightTeal)
+    )
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.9f)),
+            .background(brush = gradientBackground),
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -221,40 +235,46 @@ fun AlarmScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
+            // Clock icon
             Icon(
                 imageVector = Icons.Default.Alarm,
                 contentDescription = "Alarm",
-                tint = MaterialTheme.colorScheme.onPrimary,
+                tint = Color.White,
                 modifier = Modifier.size(80.dp)
             )
 
             Spacer(modifier = Modifier.height(32.dp))
 
+            // Title
             Text(
                 text = "Time for your habit",
                 style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.onPrimary,
+                color = Color.White,
                 textAlign = TextAlign.Center
             )
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            // Habit name
             Text(
                 text = habitName,
                 style = MaterialTheme.typography.headlineLarge,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onPrimary,
+                color = Color.White,
                 textAlign = TextAlign.Center
             )
 
             Spacer(modifier = Modifier.height(48.dp))
 
-            // Complete habit button
+            // Complete habit button - using Tertiary color from theme
             Button(
                 onClick = onComplete,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .clip(RoundedCornerShape(28.dp)),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.tertiary
+                    containerColor = Tertiary
                 )
             ) {
                 Icon(
@@ -270,12 +290,15 @@ fun AlarmScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Changed to OutlinedButton for visual distinction
+            // Skip button - using transparent button with outlined style
             OutlinedButton(
                 onClick = onDismiss,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .clip(RoundedCornerShape(28.dp)),
                 colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = MaterialTheme.colorScheme.onPrimary
+                    contentColor = Color.White
                 )
             ) {
                 Icon(
@@ -292,15 +315,19 @@ fun AlarmScreen(
             if (snoozeEnabled) {
                 Spacer(modifier = Modifier.height(16.dp))
 
+                // Snooze button - using Secondary color from theme (darker blue)
                 Button(
                     onClick = onSnooze,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp)
+                        .clip(RoundedCornerShape(28.dp)),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.secondary
+                        containerColor = Secondary
                     )
                 ) {
                     Text(
-                        text = "Snooze for ${AlarmUtils.SNOOZE_TIME_MINUTES} minutes",
+                        text = "Snooze for 5 minutes",
                         fontSize = 18.sp
                     )
                 }
