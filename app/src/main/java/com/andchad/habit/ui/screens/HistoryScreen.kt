@@ -2,55 +2,15 @@ package com.andchad.habit.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.CalendarToday
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.FilterList
-import androidx.compose.material.icons.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.filled.KeyboardArrowRight
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Divider
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedCard
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -62,373 +22,220 @@ import com.andchad.habit.data.model.HabitHistory
 import com.andchad.habit.data.model.HabitStatus
 import com.andchad.habit.ui.HabitViewModel
 import com.andchad.habit.ui.components.ModernTopAppBar
-import com.andchad.habit.ui.screens.components.DeleteConfirmationDialog
 import java.time.Instant
 import java.time.LocalDate
-import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import java.time.format.TextStyle
-import java.util.Locale
-import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HistoryScreen(
     habitHistory: List<HabitHistory>,
-    habitNameMap: Map<String, String>, // Map of habit IDs to names
+    habitNameMap: Map<String, String>,
     viewModel: HabitViewModel,
     modifier: Modifier = Modifier
 ) {
-    // State for date selection - Default to today but never allow future dates
+    var showFilterSheet by remember { mutableStateOf(false) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
+
+    // Filter states
+    var searchQuery by remember { mutableStateOf("") }
+    var selectedDateRange by remember { mutableStateOf(DateRange.TODAY) }
+    var selectedStatus by remember { mutableStateOf<HabitStatus?>(null) }
+
+    // Date range for filtering
     val today = LocalDate.now()
-    var selectedDate by remember { mutableStateOf(today) }
-    var showCalendar by remember { mutableStateOf(false) }
-    var showDeleteConfirmation by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
-
-    // Filter state
-    var expandedFilterMenu by remember { mutableStateOf(false) }
-    var selectedHabitId by remember { mutableStateOf<String?>(null) }
-
-    // Create list of habits for filtering: "All Habits" + all habits with history
-    val habitOptions = remember(habitHistory, habitNameMap) {
-        val habitIds = habitHistory.map { it.habitId }.distinct()
-        val options = mutableListOf<Pair<String?, String>>()
-        options.add(Pair(null, "All Habits"))
-
-        habitIds.forEach { habitId ->
-            val habitName = habitNameMap[habitId] ?: "Unknown Habit"
-            options.add(Pair(habitId, habitName))
-        }
-        options
+    val startDate = when (selectedDateRange) {
+        DateRange.TODAY -> today
+        DateRange.YESTERDAY -> today.minusDays(1)
+        DateRange.LAST_7_DAYS -> today.minusDays(6)
+        DateRange.THIS_MONTH -> today.withDayOfMonth(1)
+        DateRange.CUSTOM -> today.minusDays(7) // Default to last 7 days for custom
+    }
+    val endDate = when (selectedDateRange) {
+        DateRange.TODAY -> today
+        DateRange.YESTERDAY -> today.minusDays(1)
+        DateRange.LAST_7_DAYS -> today
+        DateRange.THIS_MONTH -> today
+        DateRange.CUSTOM -> today
     }
 
-    // Get the currently selected filter name for display
-    val currentFilterName = remember(selectedHabitId, habitOptions) {
-        habitOptions.find { it.first == selectedHabitId }?.second ?: "All Habits"
+    // Apply filters
+    val filteredHistory = habitHistory.filter { history ->
+        val historyDate = Instant.ofEpochMilli(history.date)
+            .atZone(ZoneId.systemDefault())
+            .toLocalDate()
+
+        val matchesDateRange = !historyDate.isBefore(startDate) && !historyDate.isAfter(endDate)
+        val matchesStatus = selectedStatus == null || history.status == selectedStatus
+
+        val habitName = habitNameMap[history.habitId] ?: ""
+        val matchesSearch = searchQuery.isEmpty() ||
+                habitName.contains(searchQuery, ignoreCase = true)
+
+        matchesDateRange && matchesStatus && matchesSearch
     }
 
-    // Group history items by date and apply filter
-    val groupedHistory by remember(habitHistory, selectedDate, selectedHabitId) {
-        derivedStateOf {
-            // Convert selected date to start and end of day in milliseconds
-            val startOfDay = selectedDate.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
-            val endOfDay = selectedDate.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli() - 1
-
-            // Filter history for selected date and potentially by habit ID
-            val filteredHistory = habitHistory
-                .filter { it.date in startOfDay..endOfDay }
-                .filter { selectedHabitId == null || it.habitId == selectedHabitId }
-
-            // Group by date
-            filteredHistory.groupBy {
-                // Convert timestamp to LocalDate for display
-                Instant.ofEpochMilli(it.date)
-                    .atZone(ZoneId.systemDefault())
-                    .toLocalDate()
-            }
-        }
-    }
-
-    if (showDeleteConfirmation) {
-        DeleteConfirmationDialog(
-            title = "Delete All History",
-            message = "Are you sure you want to delete all habit history? This action cannot be undone.",
-            onConfirm = {
-                viewModel.clearAllHabitHistory()
-                showDeleteConfirmation = false
-            },
-            onDismiss = {
-                showDeleteConfirmation = false
-            }
-        )
-    }
+    // Group by date for display
+    val groupedHistory = filteredHistory.groupBy { history ->
+        Instant.ofEpochMilli(history.date)
+            .atZone(ZoneId.systemDefault())
+            .toLocalDate()
+    }.entries.sortedByDescending { it.key }
 
     Scaffold(
         topBar = {
             ModernTopAppBar(
-                title = "Habit History",
-                actions = {
-                    IconButton(
-                        onClick = { showDeleteConfirmation = true },
-                        enabled = habitHistory.isNotEmpty()
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = "Delete All History",
-                            tint = if (habitHistory.isNotEmpty())
-                                Color.White
-                            else
-                                Color.White.copy(alpha = 0.38f)
-                        )
-                    }
-                }
+                title = "Habit History"
+                // Removed the delete button from here
             )
         },
-    ) { paddingValues ->
-        Column(
-            modifier = modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
-            // Date selection header
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = { showFilterSheet = true },
+                containerColor = MaterialTheme.colorScheme.primary
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column {
-                        Text(
-                            text = selectedDate.format(DateTimeFormatter.ofPattern("MMMM d, yyyy")),
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                        Text(
-                            text = selectedDate.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.getDefault()),
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-
-                    Button(
-                        onClick = { showCalendar = true }
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.CalendarToday,
-                            contentDescription = "Select Date",
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Select Date")
-                    }
-                }
+                Icon(
+                    imageVector = Icons.Default.FilterList,
+                    contentDescription = "Filter History"
+                )
             }
-
-            // Filter by habit name
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-            ) {
-                OutlinedCard(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { expandedFilterMenu = true }
+        },
+        bottomBar = {
+            // Only show delete button if there's history to delete
+            if (habitHistory.isNotEmpty()) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shadowElevation = 8.dp
                 ) {
-                    Row(
+                    Button(
+                        onClick = { showDeleteDialog = true },
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                            contentColor = MaterialTheme.colorScheme.error
+                        )
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.FilterList,
-                                contentDescription = "Filter",
-                                modifier = Modifier.size(24.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = currentFilterName,
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                        }
                         Icon(
-                            imageVector = Icons.Default.ArrowDropDown,
-                            contentDescription = "Show options"
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Delete All",
+                            modifier = Modifier.padding(end = 8.dp)
                         )
-                    }
-                }
-
-                DropdownMenu(
-                    expanded = expandedFilterMenu,
-                    onDismissRequest = { expandedFilterMenu = false },
-                    modifier = Modifier.fillMaxWidth(0.8f)
-                ) {
-                    habitOptions.forEach { (habitId, name) ->
-                        DropdownMenuItem(
-                            text = { Text(name) },
-                            onClick = {
-                                selectedHabitId = habitId
-                                expandedFilterMenu = false
-                            },
-                            trailingIcon = {
-                                if (habitId == selectedHabitId) {
-                                    Icon(
-                                        imageVector = Icons.Default.Check,
-                                        contentDescription = "Selected",
-                                        tint = MaterialTheme.colorScheme.primary
-                                    )
-                                }
-                            }
-                        )
+                        Text("Clear All History")
                     }
                 }
             }
+        }
+    ) { padding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+        ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                // Search Bar
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    placeholder = { Text("Search habits...") },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = "Search"
+                        )
+                    },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { searchQuery = "" }) {
+                                Icon(
+                                    imageVector = Icons.Default.Clear,
+                                    contentDescription = "Clear"
+                                )
+                            }
+                        }
+                    },
+                    singleLine = true,
+                    shape = RoundedCornerShape(8.dp)
+                )
 
-            // Delete all history button
-            if (habitHistory.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(8.dp))
-
-                FilledTonalButton(
-                    onClick = { showDeleteConfirmation = true },
+                // Filters chips row
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp),
-                    colors = ButtonDefaults.filledTonalButtonColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer,
-                        contentColor = MaterialTheme.colorScheme.error
-                    )
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Delete,
-                        contentDescription = "Delete All History",
-                        modifier = Modifier.padding(end = 8.dp)
+                    FilterChip(
+                        selected = selectedStatus == HabitStatus.COMPLETED,
+                        onClick = {
+                            selectedStatus = if (selectedStatus == HabitStatus.COMPLETED)
+                                null else HabitStatus.COMPLETED
+                        },
+                        label = { Text("Completed") },
+                        leadingIcon = if (selectedStatus == HabitStatus.COMPLETED) {
+                            { Icon(Icons.Default.Check, null, Modifier.size(16.dp)) }
+                        } else null
                     )
-                    Text("Clear All History")
+
+                    FilterChip(
+                        selected = selectedStatus == HabitStatus.MISSED,
+                        onClick = {
+                            selectedStatus = if (selectedStatus == HabitStatus.MISSED)
+                                null else HabitStatus.MISSED
+                        },
+                        label = { Text("Missed") },
+                        leadingIcon = if (selectedStatus == HabitStatus.MISSED) {
+                            { Icon(Icons.Default.Close, null, Modifier.size(16.dp)) }
+                        } else null
+                    )
+
+                    Spacer(modifier = Modifier.weight(1f))
+
+                    AssistChip(
+                        onClick = { showFilterSheet = true },
+                        label = { Text(selectedDateRange.label) },
+                        leadingIcon = { Icon(Icons.Default.DateRange, null, Modifier.size(16.dp)) }
+                    )
                 }
-            }
 
-            Spacer(modifier = Modifier.height(8.dp))
+                Divider(modifier = Modifier.padding(vertical = 8.dp))
 
-            // Quick date navigation - only show "Yesterday" and "Today" options
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                // Previous Day Button
-                OutlinedCard(
-                    modifier = Modifier
-                        .padding(4.dp)
-                        .clickable {
-                            // Only allow navigating to past dates, not future
-                            val prevDay = selectedDate.minusDays(1)
-                            selectedDate = prevDay
-                        }
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                if (groupedHistory.isEmpty()) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.KeyboardArrowLeft,
-                            contentDescription = "Previous Day",
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = "Previous Day",
-                            style = MaterialTheme.typography.bodyMedium
+                            text = "No habit records found",
+                            style = MaterialTheme.typography.bodyLarge,
+                            textAlign = TextAlign.Center
                         )
                     }
-                }
-
-                // Today button (only enabled if not already viewing today)
-                OutlinedCard(
-                    modifier = Modifier
-                        .padding(4.dp)
-                        .clickable(enabled = selectedDate != today) { selectedDate = today }
-                ) {
-                    Text(
-                        text = "Today",
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = if (selectedDate == today)
-                            MaterialTheme.colorScheme.primary
-                        else
-                            MaterialTheme.colorScheme.onSurface
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // History content
-            if (groupedHistory.isEmpty()) {
-                // Empty state
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    val message = if (selectedHabitId != null) {
-                        "No history for '${currentFilterName}' on this date"
-                    } else {
-                        "No habit records for this date"
-                    }
-
-                    Text(
-                        text = message,
-                        style = MaterialTheme.typography.bodyLarge,
-                        textAlign = TextAlign.Center
-                    )
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    groupedHistory.forEach { (date, historyItems) ->
-                        // Date header
-                        item {
-                            Text(
-                                text = date.format(DateTimeFormatter.ofPattern("MMMM d, yyyy")),
-                                style = MaterialTheme.typography.titleMedium,
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                            )
-                        }
-
-                        // Completed habits
-                        val completedItems = historyItems.filter { it.status == HabitStatus.COMPLETED }
-                        if (completedItems.isNotEmpty()) {
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(bottom = 80.dp, start = 16.dp, end = 16.dp)
+                    ) {
+                        groupedHistory.forEach { (date, historyItems) ->
                             item {
                                 Text(
-                                    text = "Completed",
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                                    text = date.format(DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy")),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(vertical = 12.dp)
                                 )
                             }
 
-                            items(completedItems) { historyItem ->
-                                HabitHistoryItem(
-                                    habitName = habitNameMap[historyItem.habitId] ?: "Unknown Habit",
-                                    status = HabitStatus.COMPLETED,
-                                    modifier = Modifier.padding(horizontal = 16.dp)
-                                )
-                            }
-                        }
-
-                        // Missed habits
-                        val missedItems = historyItems.filter { it.status == HabitStatus.MISSED }
-                        if (missedItems.isNotEmpty()) {
-                            item {
-                                Text(
-                                    text = "Missed",
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = MaterialTheme.colorScheme.error,
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-                                )
-                            }
-
-                            items(missedItems) { historyItem ->
-                                HabitHistoryItem(
-                                    habitName = habitNameMap[historyItem.habitId] ?: "Unknown Habit",
-                                    status = HabitStatus.MISSED,
-                                    modifier = Modifier.padding(horizontal = 16.dp)
+                            items(historyItems) { item ->
+                                HabitHistoryCard(
+                                    habitName = habitNameMap[item.habitId] ?: "Unknown Habit",
+                                    status = item.status,
+                                    modifier = Modifier.padding(vertical = 4.dp)
                                 )
                             }
                         }
@@ -438,30 +245,98 @@ fun HistoryScreen(
         }
     }
 
-    // Calendar dialog
-    if (showCalendar) {
-        PastDatePickerDialog(
-            initialDate = selectedDate,
-            maxDate = today, // Don't allow selecting future dates
-            onDateSelected = {
-                selectedDate = it
-                showCalendar = false
+    if (showFilterSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showFilterSheet = false }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+                Text(
+                    text = "Filter by Date",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                DateRangeOption(
+                    title = "Today",
+                    selected = selectedDateRange == DateRange.TODAY,
+                    onClick = {
+                        selectedDateRange = DateRange.TODAY
+                        showFilterSheet = false
+                    }
+                )
+
+                DateRangeOption(
+                    title = "Yesterday",
+                    selected = selectedDateRange == DateRange.YESTERDAY,
+                    onClick = {
+                        selectedDateRange = DateRange.YESTERDAY
+                        showFilterSheet = false
+                    }
+                )
+
+                DateRangeOption(
+                    title = "Last 7 days",
+                    selected = selectedDateRange == DateRange.LAST_7_DAYS,
+                    onClick = {
+                        selectedDateRange = DateRange.LAST_7_DAYS
+                        showFilterSheet = false
+                    }
+                )
+
+                DateRangeOption(
+                    title = "This month",
+                    selected = selectedDateRange == DateRange.THIS_MONTH,
+                    onClick = {
+                        selectedDateRange = DateRange.THIS_MONTH
+                        showFilterSheet = false
+                    }
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+            }
+        }
+    }
+
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = { Text("Clear History") },
+            text = { Text("Are you sure you want to delete all habit history? This action cannot be undone.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.clearAllHabitHistory()
+                        showDeleteDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Delete All")
+                }
             },
-            onDismiss = { showCalendar = false }
+            dismissButton = {
+                OutlinedButton(onClick = { showDeleteDialog = false }) {
+                    Text("Cancel")
+                }
+            }
         )
     }
 }
 
 @Composable
-fun HabitHistoryItem(
+fun HabitHistoryCard(
     habitName: String,
     status: HabitStatus,
     modifier: Modifier = Modifier
 ) {
     Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
+        modifier = modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         )
@@ -472,7 +347,6 @@ fun HabitHistoryItem(
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Status indicator
             Box(
                 modifier = Modifier
                     .size(40.dp)
@@ -510,174 +384,36 @@ fun HabitHistoryItem(
 }
 
 @Composable
-fun PastDatePickerDialog(
-    initialDate: LocalDate,
-    maxDate: LocalDate, // Maximum date (today)
-    onDateSelected: (LocalDate) -> Unit,
-    onDismiss: () -> Unit
+fun DateRangeOption(
+    title: String,
+    selected: Boolean,
+    onClick: () -> Unit
 ) {
-    var currentMonth by remember { mutableStateOf(YearMonth.from(initialDate)) }
-    var selectedDate by remember { mutableStateOf(initialDate) }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        RadioButton(
+            selected = selected,
+            onClick = onClick
+        )
 
-    androidx.compose.material3.AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Column {
-                Text("Select Date")
+        Spacer(modifier = Modifier.width(8.dp))
 
-                // Month navigation
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Previous month button
-                    IconButton(
-                        onClick = { currentMonth = currentMonth.minusMonths(1) }
-                    ) {
-                        Icon(Icons.Default.KeyboardArrowLeft, "Previous Month")
-                    }
-
-                    // Current month display
-                    Text(
-                        text = currentMonth.format(DateTimeFormatter.ofPattern("MMMM yyyy")),
-                        style = MaterialTheme.typography.titleMedium
-                    )
-
-                    // Next month button (disabled if would go past today)
-                    IconButton(
-                        onClick = {
-                            val nextMonth = currentMonth.plusMonths(1)
-                            if (!nextMonth.isAfter(YearMonth.from(maxDate))) {
-                                currentMonth = nextMonth
-                            }
-                        },
-                        enabled = !currentMonth.plusMonths(1).isAfter(YearMonth.from(maxDate))
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.KeyboardArrowRight,
-                            contentDescription = "Next Month",
-                            tint = if (!currentMonth.plusMonths(1).isAfter(YearMonth.from(maxDate)))
-                                MaterialTheme.colorScheme.onSurface
-                            else
-                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                        )
-                    }
-                }
-            }
-        },
-        text = {
-            Column {
-                // Day of week headers
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
-                    val daysOfWeek = listOf("Su", "Mo", "Tu", "We", "Th", "Fr", "Sa")
-                    daysOfWeek.forEach { day ->
-                        Text(
-                            text = day,
-                            modifier = Modifier.weight(1f),
-                            textAlign = TextAlign.Center,
-                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold)
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Calendar grid
-                val firstDayOfMonth = currentMonth.atDay(1)
-                val firstDayOfWeek = firstDayOfMonth.dayOfWeek.value % 7 // 0 = Sunday, 6 = Saturday
-                val daysInMonth = currentMonth.lengthOfMonth()
-
-                // Calculate rows needed (maximum of 6 rows)
-                val rows = ((firstDayOfWeek + daysInMonth - 1) / 7) + 1
-
-                Column {
-                    for (row in 0 until rows) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceEvenly
-                        ) {
-                            for (column in 0..6) {
-                                val day = (row * 7 + column) - firstDayOfWeek + 1
-
-                                if (day in 1..daysInMonth) {
-                                    val date = currentMonth.atDay(day)
-                                    val isSelected = date == selectedDate
-                                    val isToday = date == maxDate
-                                    val isPast = !date.isAfter(maxDate)
-
-                                    Box(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .padding(4.dp)
-                                            .size(36.dp)
-                                            .clip(CircleShape)
-                                            .background(
-                                                when {
-                                                    isSelected -> MaterialTheme.colorScheme.primary
-                                                    isToday -> MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
-                                                    else -> Color.Transparent
-                                                }
-                                            )
-                                            .clickable(enabled = isPast) {
-                                                selectedDate = date
-                                            },
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = day.toString(),
-                                            color = when {
-                                                isSelected -> MaterialTheme.colorScheme.onPrimary
-                                                !isPast -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                                                else -> MaterialTheme.colorScheme.onSurface
-                                            }
-                                        )
-                                    }
-                                } else {
-                                    // Empty space for days not in this month
-                                    Spacer(modifier = Modifier.weight(1f))
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = { onDateSelected(selectedDate) }
-            ) {
-                Text("Select")
-            }
-        },
-        dismissButton = {
-            Button(
-                onClick = onDismiss
-            ) {
-                Text("Cancel")
-            }
-        }
-    )
+        Text(
+            text = title,
+            style = MaterialTheme.typography.bodyLarge
+        )
+    }
 }
 
-@Composable
-private fun IconButton(
-    onClick: () -> Unit,
-    enabled: Boolean = true,
-    content: @Composable () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .size(40.dp)
-            .clip(CircleShape)
-            .clickable(enabled = enabled, onClick = onClick),
-        contentAlignment = Alignment.Center
-    ) {
-        content()
-    }
+enum class DateRange(val label: String) {
+    TODAY("Today"),
+    YESTERDAY("Yesterday"),
+    LAST_7_DAYS("Last 7 days"),
+    THIS_MONTH("This month"),
+    CUSTOM("Custom range")
 }
